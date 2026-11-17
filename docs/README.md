@@ -1,10 +1,10 @@
-&lt;p align="center"&gt; &lt;img src="public/banner.png" width="100%" alt="Symbiote banner" /&gt; &lt;/p&gt;
+<p align="center"><img src="../public/banner.png" width="100%" alt="Symbiote banner" /></p>
 
-&lt;h1 align="center"&gt; &lt;img src="public/logo\_bgremoved.png" width="44" height="44" alt="Symbiote logo" align="center" /&gt; Symbiote &lt;/h1&gt;
+<h1 align="center"><img src="../public/logo_bgremoved.png" width="44" height="44" alt="Symbiote logo" /> Symbiote</h1>
 
-&lt;p align="center"&gt; &lt;strong&gt;Web-powered AI. Terminal-native coding. One symbiotic harness.&lt;/strong&gt; &lt;/p&gt;
+<p align="center"><strong>Web-powered AI. Terminal-native coding. One symbiotic harness.</strong></p>
 
-&lt;p align="center"&gt; An experimental terminal coding harness that brings conversational AI services into your local development environment. &lt;/p&gt;
+<p align="center">An experimental terminal coding harness that brings conversational AI services into your local development environment.</p>
 
 ---
 
@@ -19,7 +19,7 @@ It combines unofficial web-session adapters with [Pi](https://github.com/earendi
 ```
 symbiote/
 ├── ai-service/       # ChatGPT and Gemini adapters
-├── harness/          # Pi source and Python harness
+├── harness/          # Pi source and Symbiote provider extension
 ├── docs/             # Documentation and setup guides
 ├── public/           # Branding and visual assets
 ├── requirements.txt  # Python dependencies
@@ -40,7 +40,7 @@ symbiote/
 
 From the project root:
 
-```
+```powershell
 python -m pip install -r requirements.txt
 ```
 
@@ -48,10 +48,11 @@ python -m pip install -r requirements.txt
 
 Navigate to the harness directory:
 
-```
+```powershell
 cd harness
 npm install --ignore-scripts
 npm run build:offline
+cd ..
 ```
 
 This builds the bundled Pi runtime without executing dependency installation scripts.
@@ -64,31 +65,35 @@ Symbiote currently supports two experimental web-session adapters.
 
 Run the setup script:
 
-```
+```powershell
 python ai-service/chatgpt/chatgpt_setup.py
 ```
 
 Alternatively, configure the required values manually using `.env.example`.
 
-The ChatGPT adapter also requires the ignored `.vendor/chatgpt-web` files.
+The ChatGPT adapter also requires the ignored `.vendor/chatgpt-web` files. If they are not present, obtain them from the [upstream project](https://github.com/tritao/chatgpt-web):
+
+```powershell
+git clone https://github.com/tritao/chatgpt-web.git .vendor/chatgpt-web
+```
 
 **Gemini**
 
 Configure the required Gemini session credentials in the root `.env` file.
 
-Refer to the Gemini setup documentation for details.
+Refer to the [Gemini setup guide](gemini.md) for details.
 
 ### 4. Launch Symbiote
 
 Navigate to the directory of the codebase you want to work on and run:
 
-```
+```powershell
 powershell -ExecutionPolicy Bypass -File "C:\path\to\symbiote\symbiote.ps1"
 ```
 
 To use Gemini instead of the default provider:
 
-```
+```powershell
 powershell -ExecutionPolicy Bypass -File "C:\path\to\symbiote\symbiote.ps1" -Provider gemini
 ```
 
@@ -103,7 +108,7 @@ Symbiote bridges conversational AI services with a local coding-agent runtime.
 - **Coding Harness:** Uses Pi's tools to inspect and modify files and execute terminal commands.
 - **Local Execution:** Works within the project directory from which Symbiote is launched.
 
-## Limitations &amp; Security
+## Limitations & Security
 
 Symbiote is experimental and relies on unofficial web-session interfaces.
 
@@ -124,8 +129,8 @@ Symbiote is under active development. Provider integrations, harness orchestrati
 
 Symbiote builds on [Pi](https://github.com/earendil-works/pi), the extensible coding-agent harness created by Mario Zechner and contributors.
 
-Pi is distributed under the [MIT License](https://github.com/earendil-works/pi/blob/main/LICENSE). Its original license and copyright notices are preserved in `harness/LICENSE`.
+Pi is distributed under the [MIT License](https://github.com/earendil-works/pi/blob/main/LICENSE).
 
 ---
 
-&lt;p align="center"&gt; &lt;strong&gt;Symbiote&lt;/strong&gt;&lt;br/&gt; &lt;sub&gt;One interface. Multiple minds. Your terminal.&lt;/sub&gt; &lt;/p&gt;
+<p align="center"><strong>Symbiote</strong><br/><sub>One interface. Multiple minds. Your terminal.</sub></p>

@@ -1,6 +1,7 @@
 /** Pi provider for Symbiote's local ChatGPT and Gemini web-session adapters. */
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -13,9 +14,20 @@ import {
   type ToolCall,
   type TranscriptContext,
 } from '@earendil-works/pi-ai';
-import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
+import { VERSION, type ExtensionAPI } from '@earendil-works/pi-coding-agent';
 
 const bridge = join(dirname(fileURLToPath(import.meta.url)), '..', 'ai-service', 'pi_bridge.py');
+const artPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'symbiote.txt');
+
+export function renderSymbioteArt(art: string, width: number, height: number): string[] {
+  if (width < 24 || height < 14) return [];
+  const lines = art.replace(/\r/g, '').replace(/\n$/, '').split('\n');
+  const maxWidth = Math.max(...lines.map(line => line.length));
+  const stride = Math.max(1, Math.ceil(maxWidth / Math.max(1, width - 2)), Math.ceil(lines.length / Math.max(1, height - 10)));
+  return lines.filter((_line, index) => index % stride === 0).map(line =>
+    Array.from(line).filter((_char, index) => index % stride === 0).join('').trimEnd(),
+  );
+}
 const instructions = `You are the model for a local coding assistant. Return ONLY one JSON object, with no markdown or prose outside it.
 To answer, return {"type":"final","message":"your answer"}.
 To use tools, return {"type":"tool","name":"exact tool name","arguments":{...}} or {"type":"tools","calls":[{"name":"exact tool name","arguments":{...}}]}.
@@ -107,6 +119,23 @@ export function streamSymbiote(model: Model<Api>, context: TranscriptContext, op
 }
 
 export default function (pi: ExtensionAPI) {
+  pi.on('session_start', async (_event, ctx) => {
+    if (ctx.mode !== 'tui') return;
+    let art = '';
+    try { art = readFileSync(artPath, 'utf8'); } catch { /* Keep the text header if the asset is missing. */ }
+    ctx.ui.setHeader((_tui, theme) => ({
+      render(width: number) {
+        const height = process.stdout.rows || 24;
+        const lines = art ? renderSymbioteArt(art, width, height) : [];
+        return [
+          ...lines.map(line => theme.fg('accent', line)),
+          theme.fg('accent', 'Symbiote') + theme.fg('dim', ` · powered by Pi v${VERSION}`),
+          theme.fg('dim', 'Ctrl+C interrupt · / commands'),
+        ];
+      },
+      invalidate() {},
+    }));
+  });
   pi.registerProvider('symbiote', {
     baseUrl: 'http://127.0.0.1', apiKey: 'symbiote-local', api: 'symbiote-web',
     models: ['chatgpt', 'gemini'].map(id => ({ id, name: `Symbiote ${id}`, reasoning: false,
