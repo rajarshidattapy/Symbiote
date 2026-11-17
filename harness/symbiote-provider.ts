@@ -15,15 +15,35 @@ import {
   type TranscriptContext,
 } from '@earendil-works/pi-ai';
 import { VERSION, type ExtensionAPI } from '@earendil-works/pi-coding-agent';
+import { Image, getCapabilities, getPngDimensions } from '@earendil-works/pi-tui';
 
 const bridge = join(dirname(fileURLToPath(import.meta.url)), '..', 'ai-service', 'pi_bridge.py');
 const artPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'symbiote-compact.txt');
+const logoPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'logo_bgremoved.png');
+const defaultArt = ' ▄████▄ \n██▚  ▞██\n▐██▄▄██▌\n ▀▀▀▀▀▀ ';
 
 export function renderSymbioteArt(art: string, width: number, height: number): string[] {
-  if (width < 24 || height < 14) return [];
+  if (width < 10 || height < 14) return [];
   const lines = art.replace(/\r/g, '').replace(/\n$/, '').split('\n');
-  if (lines.length > height - 10 || lines.some(line => line.length > width - 2)) return [];
-  return lines;
+  if (lines.length !== 4 || lines.some(line => Array.from(line).length > 8)) return renderSymbioteArt(defaultArt, width, height);
+  return lines.map(line => line.padEnd(8));
+}
+
+export function createSymbioteLogo(pngBase64: string | undefined, art: string, color: (text: string) => string) {
+  const validPng = pngBase64 && getPngDimensions(pngBase64);
+  const image = validPng ? new Image(pngBase64, 'image/png', { fallbackColor: color }, {
+    maxWidthCells: 8, maxHeightCells: 4, filename: 'Symbiote logo',
+  }) : undefined;
+  return {
+    render(width: number, height: number): readonly string[] {
+      if (image && width >= 10 && height >= 14 && getCapabilities().images) {
+        const lines = image.render(width);
+        if (lines.some(line => line.includes('\x1b_G') || line.includes('\x1b]1337;File='))) return lines;
+      }
+      return renderSymbioteArt(art, width, height).map(color);
+    },
+    invalidate() { image?.invalidate(); },
+  };
 }
 const instructions = `You are the model for a local coding assistant. Return ONLY one JSON object, with no markdown or prose outside it.
 To answer, return {"type":"final","message":"your answer"}.
@@ -118,20 +138,23 @@ export function streamSymbiote(model: Model<Api>, context: TranscriptContext, op
 export default function (pi: ExtensionAPI) {
   pi.on('session_start', async (_event, ctx) => {
     if (ctx.mode !== 'tui') return;
-    let art = '';
+    let art = defaultArt;
     try { art = readFileSync(artPath, 'utf8'); } catch { /* Keep the text header if the asset is missing. */ }
-    ctx.ui.setHeader((_tui, theme) => ({
+    let png: string | undefined;
+    try { png = readFileSync(logoPath).toString('base64'); } catch { /* Use the text fallback. */ }
+    ctx.ui.setHeader((_tui, theme) => {
+      const logo = createSymbioteLogo(png, art, text => theme.fg('accent', text));
+      return {
       render(width: number) {
         const height = process.stdout.rows || 24;
-        const lines = art ? renderSymbioteArt(art, width, height) : [];
         return [
-          ...lines.map(line => theme.fg('accent', line)),
-          theme.fg('accent', 'Symbiote') + theme.fg('dim', ` · powered by Pi v${VERSION}`),
+          ...logo.render(width, height),
+          '\x1b[38;2;253;225;4mSymbiote\x1b[39m' + theme.fg('dim', ` · powered by Pi v${VERSION}`),
           theme.fg('dim', 'Ctrl+C interrupt · / commands'),
         ];
       },
-      invalidate() {},
-    }));
+      invalidate() { logo.invalidate(); },
+    }; });
   });
   pi.registerProvider('symbiote', {
     baseUrl: 'http://127.0.0.1', apiKey: 'symbiote-local', api: 'symbiote-web',

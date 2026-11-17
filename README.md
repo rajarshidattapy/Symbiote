@@ -1,6 +1,6 @@
 
 
-<h1 align="center"><img src="public/logo_bgremoved.png" width="44" height="44" alt="Symbiote logo" /> Symbiote</h1>
+<h1 align="center"><img src="public/logo_bgremoved.png" width="44" height="44" align="absmiddle" alt="Symbiote logo" /> Symbiote</h1>
 
 <p align="center"><strong>Web-powered AI. Terminal-native coding. One symbiotic harness.</strong></p>
 
