@@ -11,7 +11,7 @@ import uuid
 
 from dotenv import dotenv_values
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[2]
 VENDOR = ROOT / '.vendor' / 'chatgpt-web'
 sys.path.insert(0, str(VENDOR))
 if os.name == 'nt':

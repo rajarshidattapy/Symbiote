@@ -5,7 +5,7 @@ import uuid
 
 from dotenv import dotenv_values
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[2]
 
 
 class GeminiService:

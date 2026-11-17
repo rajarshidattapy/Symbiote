@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import tempfile
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[2]
 ENV_FILE = ROOT / '.env'
 
 
@@ -47,8 +47,7 @@ def setup(path=ENV_FILE):
         if tmp is not None:
             tmp.unlink(missing_ok=True)
     print(f'Saved {path}. Keep this file private; it grants access to your account.')
-    print('Start chat: python chat.py')
-    print('Start coding harness: python harness/agent.py')
+    print('Start chat: python ai-service/chatgpt/chatgpt.py')
     return 0
 
 
