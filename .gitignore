@@ -1,0 +1,7 @@
+.chatgpt-profile/
+__pycache__/
+.venv/
+node_modules/
+.env
+.env-*
+.vendor/
