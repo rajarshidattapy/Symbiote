@@ -20,7 +20,33 @@ import { Image, getCapabilities, getPngDimensions } from '@earendil-works/pi-tui
 const bridge = join(dirname(fileURLToPath(import.meta.url)), '..', 'ai-service', 'pi_bridge.py');
 const artPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'symbiote-compact.txt');
 const logoPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'logo_bgremoved.png');
+const pixelsPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'symbiote-logo-pixels.json');
 const defaultArt = ' ▄████▄ \n██▚  ▞██\n▐██▄▄██▌\n ▀▀▀▀▀▀ ';
+
+type LogoPixels = { width: number; height: number; pixels: number[][] };
+
+export function renderLogoPixels(data: LogoPixels, trueColor: boolean): string[] {
+  if (!data || data.width !== 12 || data.height !== 12 || !Array.isArray(data.pixels) || data.pixels.length !== 144 ||
+      data.pixels.some(pixel => !Array.isArray(pixel) || pixel.length !== 4 || pixel.some(value => !Number.isInteger(value) || value < 0 || value > 255))) return [];
+  const color = (pixel: number[], bg: boolean) => trueColor
+    ? `\x1b[${bg ? 48 : 38};2;${pixel[0]};${pixel[1]};${pixel[2]}m`
+    : `\x1b[${bg ? 103 : 93}m`;
+  const rows: string[] = [];
+  for (let y = 0; y < data.height; y += 2) {
+    let row = '';
+    for (let x = 0; x < data.width; x++) {
+      const top = data.pixels[y * data.width + x];
+      const bottom = data.pixels[(y + 1) * data.width + x];
+      const t = top[3] >= 64, b = bottom[3] >= 64;
+      if (t && b) row += color(top, false) + color(bottom, true) + '▀\x1b[0m';
+      else if (t) row += color(top, false) + '▀\x1b[0m';
+      else if (b) row += color(bottom, false) + '▄\x1b[0m';
+      else row += ' ';
+    }
+    rows.push(row);
+  }
+  return rows;
+}
 
 export function renderSymbioteArt(art: string, width: number, height: number): string[] {
   if (width < 10 || height < 14) return [];
@@ -29,7 +55,7 @@ export function renderSymbioteArt(art: string, width: number, height: number): s
   return lines.map(line => line.padEnd(8));
 }
 
-export function createSymbioteLogo(pngBase64: string | undefined, art: string, color: (text: string) => string) {
+export function createSymbioteLogo(pngBase64: string | undefined, art: string, color: (text: string) => string, pixels?: LogoPixels) {
   const validPng = pngBase64 && getPngDimensions(pngBase64);
   const image = validPng ? new Image(pngBase64, 'image/png', { fallbackColor: color }, {
     maxWidthCells: 8, maxHeightCells: 4, filename: 'Symbiote logo',
@@ -39,6 +65,10 @@ export function createSymbioteLogo(pngBase64: string | undefined, art: string, c
       if (image && width >= 10 && height >= 14 && getCapabilities().images) {
         const lines = image.render(width);
         if (lines.some(line => line.includes('\x1b_G') || line.includes('\x1b]1337;File='))) return lines;
+      }
+      if (image && pixels && width >= 14 && height >= 16 && !('NO_COLOR' in process.env)) {
+        const blocks = renderLogoPixels(pixels, getCapabilities().trueColor);
+        if (blocks.length) return blocks;
       }
       return renderSymbioteArt(art, width, height).map(color);
     },
@@ -142,8 +172,10 @@ export default function (pi: ExtensionAPI) {
     try { art = readFileSync(artPath, 'utf8'); } catch { /* Keep the text header if the asset is missing. */ }
     let png: string | undefined;
     try { png = readFileSync(logoPath).toString('base64'); } catch { /* Use the text fallback. */ }
+    let pixels: LogoPixels | undefined;
+    try { pixels = JSON.parse(readFileSync(pixelsPath, 'utf8')); } catch { /* Use the text fallback. */ }
     ctx.ui.setHeader((_tui, theme) => {
-      const logo = createSymbioteLogo(png, art, text => theme.fg('accent', text));
+      const logo = createSymbioteLogo(png, art, text => theme.fg('accent', text), pixels);
       return {
       render(width: number) {
         const height = process.stdout.rows || 24;

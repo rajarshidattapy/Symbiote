@@ -7,7 +7,6 @@
 <p align="center">An experimental terminal coding harness that brings conversational AI services into your local development environment.</p>
 
 <p align="center"><img src="public/banner.png" width="100%" alt="Symbiote banner" /></p>
----
 
 ## Overview
 
