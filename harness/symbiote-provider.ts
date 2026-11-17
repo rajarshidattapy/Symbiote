@@ -17,16 +17,13 @@ import {
 import { VERSION, type ExtensionAPI } from '@earendil-works/pi-coding-agent';
 
 const bridge = join(dirname(fileURLToPath(import.meta.url)), '..', 'ai-service', 'pi_bridge.py');
-const artPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'symbiote.txt');
+const artPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'symbiote-compact.txt');
 
 export function renderSymbioteArt(art: string, width: number, height: number): string[] {
   if (width < 24 || height < 14) return [];
   const lines = art.replace(/\r/g, '').replace(/\n$/, '').split('\n');
-  const maxWidth = Math.max(...lines.map(line => line.length));
-  const stride = Math.max(1, Math.ceil(maxWidth / Math.max(1, width - 2)), Math.ceil(lines.length / Math.max(1, height - 10)));
-  return lines.filter((_line, index) => index % stride === 0).map(line =>
-    Array.from(line).filter((_char, index) => index % stride === 0).join('').trimEnd(),
-  );
+  if (lines.length > height - 10 || lines.some(line => line.length > width - 2)) return [];
+  return lines;
 }
 const instructions = `You are the model for a local coding assistant. Return ONLY one JSON object, with no markdown or prose outside it.
 To answer, return {"type":"final","message":"your answer"}.

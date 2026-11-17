@@ -1,10 +1,11 @@
-<p align="center"><img src="../public/banner.png" width="100%" alt="Symbiote banner" /></p>
 
 <h1 align="center"><img src="../public/logo_bgremoved.png" width="44" height="44" alt="Symbiote logo" /> Symbiote</h1>
 
 <p align="center"><strong>Web-powered AI. Terminal-native coding. One symbiotic harness.</strong></p>
 
 <p align="center">An experimental terminal coding harness that brings conversational AI services into your local development environment.</p>
+
+<p align="center"><img src="../public/banner.png" width="100%" alt="Symbiote banner" /></p>
 
 ---
 
