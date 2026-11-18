@@ -18,6 +18,7 @@ import { VERSION, type ExtensionAPI } from '../harness/packages/coding-agent/dis
 import { Image, getCapabilities, getPngDimensions } from '../harness/packages/tui/dist/index.js';
 import { loadSession, saveSession, sessionKey, withSessionLock, type SessionState } from './session.ts';
 import { setupSelectedModel } from './model-setup.ts';
+import { installTerminalTitleBranding } from './terminal-title.ts';
 
 const bridge = join(dirname(fileURLToPath(import.meta.url)), 'pi-bridge.ts');
 const artPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'symbiote-compact.txt');
@@ -199,6 +200,7 @@ export function streamSymbiote(model: Model<Api>, context: TranscriptContext, op
 }
 
 export default function (pi: ExtensionAPI) {
+  if (process.stdout.isTTY) installTerminalTitleBranding();
   pi.on('model_select', async (event, ctx) => {
     const provider = event.model.id;
     if (event.model.provider !== 'symbiote' || (provider !== 'chatgpt' && provider !== 'gemini') || ctx.mode !== 'tui') return;

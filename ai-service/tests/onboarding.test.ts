@@ -74,3 +74,9 @@ test('selecting an unconfigured model opens setup; cancellation saves nothing', 
   await assert.rejects(setupSelectedModel('gemini', { ...ui, confirm: async () => false }, deps), /cancelled/);
   assert.equal(writes.length, 0);
 });
+import { brandTerminalTitle } from '../terminal-title.ts';
+
+test('terminal title uses Symbiote while retaining the project and session', () => {
+  assert.equal(brandTerminalTitle('\x1b]0;π - task - project\x07'), '\x1b]0;Symbiote - task - project\x07');
+  assert.equal(brandTerminalTitle('ordinary π text'), 'ordinary π text');
+});
