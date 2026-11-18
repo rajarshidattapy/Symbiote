@@ -18,11 +18,10 @@ It combines unofficial web-session adapters with [Pi](https://github.com/earendi
 
 ```
 symbiote/
-├── ai-service/       # ChatGPT and Gemini adapters
-├── harness/          # Pi source and Symbiote provider extension
+├── ai-service/       # TypeScript adapters, provider bridge, and session handling
+├── harness/          # Pi source
 ├── docs/             # Documentation and setup guides
 ├── public/           # Branding and visual assets
-├── requirements.txt  # Python dependencies
 ├── .env.example      # Environment configuration template
 └── symbiote.ps1      # Windows launcher
 ```
@@ -32,16 +31,15 @@ symbiote/
 ### Requirements
 
 - Windows
-- Python 3.10+
 - Node.js 22.19+
 - Git
 
-### 1. Install Python dependencies
+### 1. Install AI service dependencies
 
 From the project root:
 
 ```powershell
-python -m pip install -r requirements.txt
+npm install --prefix ai-service --ignore-scripts
 ```
 
 ### 2. Build the harness
@@ -66,20 +64,16 @@ Symbiote currently supports two experimental web-session adapters.
 Run the setup script:
 
 ```powershell
-python ai-service/chatgpt/chatgpt_setup.py
+node ai-service/chatgpt/setup.ts
 ```
 
 Alternatively, configure the required values manually using `.env.example`.
 
-The ChatGPT adapter also requires the ignored `.vendor/chatgpt-web` files. If they are not present, obtain them from the [upstream project](https://github.com/tritao/chatgpt-web):
-
-```powershell
-git clone https://github.com/tritao/chatgpt-web.git .vendor/chatgpt-web
-```
+The ChatGPT adapter includes the Sentinel compatibility helper from [chatgpt-web](https://github.com/tritao/chatgpt-web); its license is retained alongside the helper.
 
 **Gemini**
 
-Configure the required Gemini session credentials in the root `.env` file.
+Run `node ai-service/gemini/setup.ts` to add the Gemini session credentials to the root `.env` file, or configure them manually.
 
 Refer to the [Gemini setup guide](docs/gemini.md) for details.
 
@@ -133,6 +127,8 @@ Symbiote is under active development. Provider integrations, harness orchestrati
 Symbiote builds on [Pi](https://github.com/earendil-works/pi), the extensible coding-agent harness created by Mario Zechner and contributors.
 
 Pi is distributed under the [MIT License](https://github.com/earendil-works/pi/blob/main/LICENSE).
+
+The ChatGPT adapter includes a helper from [chatgpt-web](https://github.com/tritao/chatgpt-web), and the Gemini adapter uses [gemini-web-api](https://github.com/qutek/gemini-web-api).
 
 ---
 

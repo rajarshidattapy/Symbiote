@@ -1,0 +1,13 @@
+{
+  "name": "symbiote-ai-service",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test tests/service.test.ts tests/session.test.ts" },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "gemini-web-api": "0.0.2"
+  }
+}

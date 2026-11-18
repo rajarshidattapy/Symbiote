@@ -6,7 +6,7 @@ param(
 )
 
 $cli = Join-Path $PSScriptRoot 'harness/packages/coding-agent/dist/cli.js'
-$extension = Join-Path $PSScriptRoot 'harness/symbiote-provider.ts'
+$extension = Join-Path $PSScriptRoot 'ai-service/pi-provider.ts'
 if (-not (Test-Path -LiteralPath $cli)) {
     Write-Error 'Pi is not built. In the harness folder run npm install --ignore-scripts and npm run build:offline.'
     exit 1

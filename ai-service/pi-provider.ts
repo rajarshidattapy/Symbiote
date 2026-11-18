@@ -13,12 +13,12 @@ import {
   type SimpleStreamOptions,
   type ToolCall,
   type TranscriptContext,
-} from '@earendil-works/pi-ai';
-import { VERSION, type ExtensionAPI } from '@earendil-works/pi-coding-agent';
-import { Image, getCapabilities, getPngDimensions } from '@earendil-works/pi-tui';
-import { loadSession, saveSession, sessionKey, withSessionLock, type SessionState } from './symbiote-session.ts';
+} from '../harness/packages/ai/dist/index.js';
+import { VERSION, type ExtensionAPI } from '../harness/packages/coding-agent/dist/index.js';
+import { Image, getCapabilities, getPngDimensions } from '../harness/packages/tui/dist/index.js';
+import { loadSession, saveSession, sessionKey, withSessionLock, type SessionState } from './session.ts';
 
-const bridge = join(dirname(fileURLToPath(import.meta.url)), '..', 'ai-service', 'pi_bridge.py');
+const bridge = join(dirname(fileURLToPath(import.meta.url)), 'pi-bridge.ts');
 const artPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'symbiote-compact.txt');
 const logoPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'logo_bgremoved.png');
 const pixelsPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'symbiote-logo-pixels.json');
@@ -93,9 +93,8 @@ type BridgeResponse = { text: string; conversation_id: string };
 function runBridge(provider: string, prompt: string, conversationId?: string, signal?: AbortSignal): Promise<BridgeResponse> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(new Error('Request aborted'));
-    const child = spawn(process.env.SYMBIOTE_PYTHON || 'python', [bridge], {
+    const child = spawn(process.execPath, [bridge], {
       stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true,
-      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
     });
     let stdout = '';
     const onAbort = () => child.kill();
