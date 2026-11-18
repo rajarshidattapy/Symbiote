@@ -17,6 +17,7 @@ import {
 import { VERSION, type ExtensionAPI } from '../harness/packages/coding-agent/dist/index.js';
 import { Image, getCapabilities, getPngDimensions } from '../harness/packages/tui/dist/index.js';
 import { loadSession, saveSession, sessionKey, withSessionLock, type SessionState } from './session.ts';
+import { setupSelectedModel } from './model-setup.ts';
 
 const bridge = join(dirname(fileURLToPath(import.meta.url)), 'pi-bridge.ts');
 const artPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'symbiote-compact.txt');
@@ -198,6 +199,15 @@ export function streamSymbiote(model: Model<Api>, context: TranscriptContext, op
 }
 
 export default function (pi: ExtensionAPI) {
+  pi.on('model_select', async (event, ctx) => {
+    const provider = event.model.id;
+    if (event.model.provider !== 'symbiote' || (provider !== 'chatgpt' && provider !== 'gemini') || ctx.mode !== 'tui') return;
+    try {
+      await setupSelectedModel(provider, ctx.ui);
+    } catch (error) {
+      ctx.ui.notify(error instanceof Error ? error.message : 'Provider setup failed.', 'error');
+    }
+  });
   pi.on('session_start', async (_event, ctx) => {
     if (ctx.mode !== 'tui') return;
     let art = defaultArt;

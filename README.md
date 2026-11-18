@@ -23,75 +23,51 @@ symbiote/
 ├── docs/             # Documentation and setup guides
 ├── public/           # Branding and visual assets
 ├── .env.example      # Environment configuration template
-└── symbiote.ps1      # Windows launcher
+├── install.ps1       # Windows installer
+├── install.sh        # macOS and Linux installer
+├── symbiote.ps1      # Windows launcher
+└── symbiote          # macOS and Linux launcher
 ```
 
 ## Getting Started
 
-### Requirements
+### Install
 
-- Windows
-- Node.js 22.19+
-- Git
+The installer supports Windows, macOS and Linux. It downloads Symbiote into `~/.symbiote/app`, installs Node.js privately if a suitable version is unavailable, builds Pi, and installs a sign-in browser. On macOS and Linux, `curl`, `tar`, and a SHA-256 utility are required.
 
-### 1. Install AI service dependencies
-
-From the project root:
+**Windows PowerShell**
 
 ```powershell
-npm install --prefix ai-service --ignore-scripts
+$symbioteInstaller = Join-Path $env:TEMP ('symbiote-install-' + [guid]::NewGuid().ToString('N') + '.ps1'); try { Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/rajarshidattapy/Symbiote/master/install.ps1' -OutFile $symbioteInstaller -ErrorAction Stop; powershell -NoProfile -ExecutionPolicy Bypass -File $symbioteInstaller } catch { Write-Error $_ }
 ```
 
-### 2. Build the harness
+**macOS or Linux**
 
-Navigate to the harness directory:
-
-```powershell
-cd harness
-npm install --ignore-scripts
-npm run build:offline
-cd ..
+```sh
+symbiote_installer=$(mktemp) && curl -fsSL 'https://raw.githubusercontent.com/rajarshidattapy/Symbiote/master/install.sh' -o "$symbiote_installer" && sh "$symbiote_installer"
 ```
 
-This builds the bundled Pi runtime without executing dependency installation scripts.
+After installing, choose ChatGPT or Gemini. A separate browser opens: sign in, complete any verification, and press Enter in the terminal while the browser remains open. Symbiote checks the session and saves its credentials locally; you do not need to edit `.env`.
 
-### 3. Configure an AI provider
+Open a new terminal, change to your project directory, and run:
 
-Symbiote currently supports two experimental web-session adapters.
-
-**ChatGPT**
-
-Run the setup script:
-
-```powershell
-node ai-service/chatgpt/setup.ts
+```text
+symbiote
 ```
 
-Alternatively, configure the required values manually using `.env.example`.
+On Windows, the installer adds `~/.symbiote/bin` to the user PATH. On macOS and Linux it installs the command in `~/.local/bin` and, when needed, adds that directory to your shell configuration. Re-running the installer preserves an existing installation and its credentials; it does not update its source files.
 
-The ChatGPT adapter includes the Sentinel compatibility helper from [chatgpt-web](https://github.com/tritao/chatgpt-web); its license is retained alongside the helper.
+### Change provider or sign in again
 
-**Gemini**
+Use `/model` inside Symbiote to select another provider; if it has not been set up, Symbiote opens the sign-in browser. To choose a provider or renew an expired session when starting Symbiote:
 
-Run `node ai-service/gemini/setup.ts` to add the Gemini session credentials to the root `.env` file, or configure them manually.
+| Action | Windows | macOS / Linux |
+| --- | --- | --- |
+| Choose provider | `symbiote -Select` | `symbiote --select` |
+| Sign in again | `symbiote -Login` | `symbiote --login` |
+| Start with Gemini | `symbiote -Provider gemini` | `symbiote --provider gemini` |
 
-Refer to the [Gemini setup guide](docs/gemini.md) for details.
-
-### 4. Launch Symbiote
-
-Navigate to the directory of the codebase you want to work on and run:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File "C:\path\to\symbiote\symbiote.ps1"
-```
-
-To use Gemini instead of the default provider:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File "C:\path\to\symbiote\symbiote.ps1" -Provider gemini
-```
-
-Replace the script path with your actual Symbiote installation location.
+The installer uses a temporary browser profile and never reads the user's existing Chrome profile. Account verification or provider changes can still prevent automated setup. A manual fallback is available via `symbiote -ManualLogin` on Windows or `symbiote --manual-login` on macOS/Linux. See the [Gemini setup guide](docs/gemini.md).
 
 ## How It Works
 

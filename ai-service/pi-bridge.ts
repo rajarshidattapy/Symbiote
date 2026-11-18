@@ -23,6 +23,7 @@ async function main(): Promise<void> {
 try { await main(); }
 catch (error) {
   // Avoid printing request contents or credentials from third-party error payloads.
-  stdout.write(JSON.stringify({ error: `${error instanceof Error ? error.name : 'Error'}: provider request failed; check session configuration.` }) + '\n');
+  const login = process.platform === 'win32' ? 'symbiote -Login' : 'symbiote --login';
+  stdout.write(JSON.stringify({ error: `${error instanceof Error ? error.name : 'Error'}: provider request failed. If your session expired, run ${login} to sign in again.` }) + '\n');
   process.exitCode = 1;
 }

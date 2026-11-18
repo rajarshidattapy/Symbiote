@@ -1,7 +1,7 @@
 /** Interactive, local-only setup for Symbiote's web-session credentials. */
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { Writable } from 'node:stream';
@@ -20,7 +20,18 @@ export function mergeEnv(source: string, values: Record<string, string>): string
   return updated.join('\n') + '\n';
 }
 
-export async function configure(provider: 'chatgpt' | 'gemini'): Promise<void> {
+/** Atomically update selected keys while retaining the other provider and settings. */
+export function saveConfig(values: Record<string, string>, path = join(projectRoot, '.env')): void {
+  const original = existsSync(path) ? readFileSync(path, 'utf8') : '';
+  const temporary = join(dirname(path), `.env-${randomUUID()}.tmp`);
+  try {
+    writeFileSync(temporary, mergeEnv(original, values), { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+    renameSync(temporary, path);
+  } finally { try { unlinkSync(temporary); } catch { /* Already moved or not created. */ } }
+}
+
+/** Manual fallback for environments where the browser-assisted flow cannot work. */
+export async function configureManual(provider: 'chatgpt' | 'gemini'): Promise<void> {
   if (!stdin.isTTY || !stdout.isTTY) throw new Error('Run setup in an interactive terminal so credentials are not echoed.');
   let muted = false;
   const output = new Writable({ write(chunk, _encoding, callback) { if (!muted) stdout.write(chunk); callback(); } });
@@ -49,13 +60,19 @@ export async function configure(provider: 'chatgpt' | 'gemini'): Promise<void> {
       values = { GEMINI_SECURE_1PSID: psid, GEMINI_SECURE_1PSIDTS: psidts };
     }
     if (Object.values(values).some(value => /[\r\n]/.test(value))) throw new Error('Values must be single-line; no changes were made.');
-    const path = join(projectRoot, '.env');
-    const original = existsSync(path) ? readFileSync(path, 'utf8') : '';
-    const temporary = join(projectRoot, `.env-${randomUUID()}.tmp`);
-    try {
-      writeFileSync(temporary, mergeEnv(original, values), { encoding: 'utf8', mode: 0o600, flag: 'wx' });
-      renameSync(temporary, path);
-    } finally { try { unlinkSync(temporary); } catch { /* Already moved or not created. */ } }
+    saveConfig({ ...values, SYMBIOTE_PROVIDER: provider });
     console.log('Saved the root .env. Existing settings for other providers were preserved.');
+  } finally { rl.close(); }
+}
+
+/** Open a private browser for the selected service and save only a verified session. */
+export async function configure(provider: 'chatgpt' | 'gemini'): Promise<void> {
+  if (!stdin.isTTY || !stdout.isTTY) throw new Error('Run setup in an interactive terminal.');
+  const rl = createInterface({ input: stdin, output: stdout });
+  try {
+    const { signIn } = await import('./browser-auth.ts');
+    const values = await signIn(provider, async () => { await rl.question('Press Enter after signing in: '); });
+    saveConfig({ ...values, SYMBIOTE_PROVIDER: provider });
+    console.log('Session saved locally. Keep your .env and account credentials private.');
   } finally { rl.close(); }
 }
