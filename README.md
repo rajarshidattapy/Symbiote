@@ -108,6 +108,8 @@ Symbiote bridges conversational AI services with a local coding-agent runtime.
 - **Coding Harness:** Uses Pi's tools to inspect and modify files and execute terminal commands.
 - **Local Execution:** Works within the project directory from which Symbiote is launched.
 
+For ChatGPT, each Pi session continues in one web conversation, including after a Pi session is resumed. Symbiote stores the Pi-to-ChatGPT conversation ID mapping under `~/.symbiote/pi-sessions/`; it does not store session cookies there. Starting a new Pi session starts a new web conversation. Pi operations that explicitly disable continuation can use a separate conversation.
+
 ## Limitations & Security
 
 Symbiote is experimental and relies on unofficial web-session interfaces.
@@ -116,6 +118,7 @@ Symbiote is experimental and relies on unofficial web-session interfaces.
 - The adapters currently support text-based interactions only; image input is not supported.
 - Tool calls and responses may fail when provider interfaces or model output formats change.
 - Gemini requires valid session credentials and may require additional verification.
+- Gemini's web-session adapter does not yet persist one web conversation across Pi turns.
 - The provider bridge forwards Pi conversations, including tool results, to the selected web service.
 - Pi can modify files and execute commands. Review its configuration and permissions before use.
 

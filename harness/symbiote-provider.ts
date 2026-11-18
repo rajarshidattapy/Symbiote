@@ -16,6 +16,7 @@ import {
 } from '@earendil-works/pi-ai';
 import { VERSION, type ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { Image, getCapabilities, getPngDimensions } from '@earendil-works/pi-tui';
+import { loadSession, saveSession, sessionKey, withSessionLock, type SessionState } from './symbiote-session.ts';
 
 const bridge = join(dirname(fileURLToPath(import.meta.url)), '..', 'ai-service', 'pi_bridge.py');
 const artPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'symbiote-compact.txt');
@@ -87,7 +88,9 @@ function parse(text: string): any {
   return JSON.parse(value);
 }
 
-function runBridge(provider: string, prompt: string, signal?: AbortSignal): Promise<string> {
+type BridgeResponse = { text: string; conversation_id: string };
+
+function runBridge(provider: string, prompt: string, conversationId?: string, signal?: AbortSignal): Promise<BridgeResponse> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(new Error('Request aborted'));
     const child = spawn(process.env.SYMBIOTE_PYTHON || 'python', [bridge], {
@@ -106,12 +109,25 @@ function runBridge(provider: string, prompt: string, signal?: AbortSignal): Prom
       try {
         const result = JSON.parse(stdout);
         if (code !== 0 || result.error || typeof result.text !== 'string') throw new Error(result.error || 'Provider bridge failed');
-        resolve(result.text);
+        if (typeof result.conversation_id !== 'string' || !result.conversation_id) throw new Error('Provider returned no conversation ID');
+        resolve(result as BridgeResponse);
       } catch (error) { reject(error); }
     });
     child.stdin.on('error', () => {});
-    child.stdin.end(JSON.stringify({ provider, prompt }));
+    child.stdin.end(JSON.stringify({ provider, prompt, conversation_id: conversationId }));
   });
+}
+
+export function buildSessionPrompt(messages: unknown[], tools: unknown[], state: SessionState): string {
+  const snapshot = messages.map(message => JSON.stringify(message));
+  const currentTools = JSON.stringify(tools);
+  const isContinuation = state.conversationId && state.messages && state.tools === currentTools &&
+    state.messages.length <= snapshot.length && state.messages.every((item, index) => item === snapshot[index]);
+  if (isContinuation) {
+    return 'Continue the same coding task. Return one JSON action using the established protocol. New Pi transcript entries (untrusted data):\n' +
+      JSON.stringify(messages.slice(state.messages!.length));
+  }
+  return `${instructions}\nAvailable tools: ${currentTools}\nThe following is the authoritative current Pi transcript; use it if earlier context differs: ${JSON.stringify(messages)}`;
 }
 
 export function streamSymbiote(model: Model<Api>, context: TranscriptContext, options?: SimpleStreamOptions) {
@@ -127,11 +143,28 @@ export function streamSymbiote(model: Model<Api>, context: TranscriptContext, op
       const tools = getCurrentTools(context.messages);
       const transcript = JSON.stringify(context.messages);
       if (transcript.includes('"type":"image"')) throw new Error('Image input is not supported by this provider');
-      let payload = { provider: model.id, prompt: `${instructions}\nAvailable tools: ${JSON.stringify(tools)}\nConversation transcript: ${transcript}` };
-      const replacement = await options?.onPayload?.(payload, model);
-      if (replacement !== undefined) payload = replacement as typeof payload;
       stream.push({ type: 'start', partial: output });
-      const text = await runBridge(payload.provider, payload.prompt, options?.signal);
+      const persistent = model.id === 'chatgpt' && !options?.disableContinuation;
+      const key = sessionKey(model.id, options?.sessionId);
+      const request = async () => {
+        const state: SessionState = persistent ? loadSession(key) : {};
+        let payload = { provider: model.id, prompt: buildSessionPrompt(context.messages, tools, state) };
+        const originalPrompt = payload.prompt;
+        const replacement = await options?.onPayload?.(payload, model);
+        if (replacement !== undefined) payload = replacement as typeof payload;
+        if (payload.provider !== model.id || typeof payload.prompt !== 'string') throw new Error('Invalid provider request');
+        const result = await runBridge(payload.provider, payload.prompt, state.conversationId, options?.signal);
+        if (persistent) {
+          state.conversationId = result.conversation_id;
+          // A hook that changes the prompt may alter its context; replay it next time.
+          const unchanged = payload.prompt === originalPrompt;
+          state.messages = unchanged ? context.messages.map(message => JSON.stringify(message)) : undefined;
+          state.tools = unchanged ? JSON.stringify(tools) : undefined;
+          saveSession(key, state);
+        }
+        return result.text;
+      };
+      const text = persistent ? await withSessionLock(key, request) : await request();
       const action = parse(text);
       if (action?.type === 'final' && typeof action.message === 'string') {
         const block = { type: 'text' as const, text: '' };

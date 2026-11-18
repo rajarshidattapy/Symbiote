@@ -21,8 +21,11 @@ def load_service(provider):
 def main():
     request = json.load(sys.stdin)
     provider, prompt = request.get('provider'), request.get('prompt')
+    conversation_id = request.get('conversation_id')
     if not isinstance(prompt, str) or not prompt:
         raise ValueError('Missing prompt')
+    if conversation_id is not None and (provider != 'chatgpt' or not isinstance(conversation_id, str) or not conversation_id):
+        raise ValueError('Invalid conversation ID')
     service = load_service(provider)
     parts = []
     def on_event(event):
@@ -33,10 +36,10 @@ def main():
     # Third-party status messages must not corrupt the JSON response.
     with contextlib.redirect_stdout(sys.stderr):
         with service.create_client() as client:
-            client.send_prompt(None, prompt, on_event=on_event)
+            resolved_id, _, _ = client.send_prompt(conversation_id, prompt, on_event=on_event)
     if not parts:
         raise RuntimeError('Provider returned no text')
-    print(json.dumps({'text': ''.join(parts)}, ensure_ascii=True), flush=True)
+    print(json.dumps({'text': ''.join(parts), 'conversation_id': resolved_id}, ensure_ascii=True), flush=True)
 
 
 if __name__ == '__main__':
