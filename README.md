@@ -71,6 +71,12 @@ The installer uses a temporary browser profile and never reads the user's existi
 
 ## How It Works
 
+### ChatGPT commands
+
+Use `/chatgpt-file path/to/file.txt | What should I change?` to send a local UTF-8 text file in the current ChatGPT conversation. This sends the file contents as text, not as a native ChatGPT attachment; files are limited to 100,000 bytes. `/chatgpt-projects` lists your ChatGPT projects without changing the current conversation. Use `/chatgpt-features` to see current support. The adapter requests a thinking model by default, though actual availability depends on the account and service.
+
+Native file and image uploads, ChatGPT library, image generation, web search, projects, deep research, and sketch are not implemented by the current text-only adapter.
+
 Symbiote bridges conversational AI services with a local coding-agent runtime.
 
 - **AI Service Adapters:** Connect to ChatGPT and Gemini through authenticated web sessions.

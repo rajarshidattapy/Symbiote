@@ -10,6 +10,7 @@ const signer = join(dirname(fileURLToPath(import.meta.url)), 'vendor', 'sentinel
 
 type Json = Record<string, any>;
 export type ChatResponse = { text: string; conversationId: string };
+export type ChatGptProject = { id: string; name: string };
 
 async function runSigner(args: string[], input?: unknown): Promise<Json> {
   return await new Promise((resolve, reject) => {
@@ -83,6 +84,29 @@ export class ChatGptService {
     if (evidence.proof) headers['openai-sentinel-proof-token'] = evidence.proof;
     if (evidence.turnstile) headers['openai-sentinel-turnstile-token'] = evidence.turnstile;
     return headers;
+  }
+
+  /** List projects without creating or changing a ChatGPT conversation. */
+  async listProjects(): Promise<ChatGptProject[]> {
+    const results: ChatGptProject[] = [];
+    const cursors = new Set<string>();
+    let cursor: string | undefined;
+    for (;;) {
+      const path = '/backend-api/gizmos/snorlax/sidebar' + (cursor ? `?cursor=${encodeURIComponent(cursor)}` : '');
+      const data = await (await this.request(path)).json() as Json;
+      if (!Array.isArray(data.items)) throw new Error('ChatGPT returned an unexpected projects list.');
+      for (const item of data.items) {
+        const gizmo = item?.gizmo;
+        if (gizmo?.gizmo_type === 'snorlax' && typeof gizmo.id === 'string' && typeof gizmo.display?.name === 'string') {
+          results.push({ id: gizmo.id, name: gizmo.display.name });
+        }
+      }
+      if (data.cursor == null || data.cursor === '') break;
+      if (typeof data.cursor !== 'string' || cursors.has(data.cursor) || cursors.size >= 100) throw new Error('ChatGPT returned invalid project pagination.');
+      cursors.add(data.cursor);
+      cursor = data.cursor;
+    }
+    return results;
   }
 
   async sendPrompt(conversationId: string | undefined, prompt: string, signal?: AbortSignal): Promise<ChatResponse> {

@@ -5,7 +5,7 @@ export function brandTerminalTitle(output: string): string {
 
 export function installTerminalTitleBranding(): void {
   const originalWrite = process.stdout.write;
-  process.stdout.write = function (chunk: any, ...args: any[]) {
+  process.stdout.write = function (this: typeof process.stdout, chunk: any, ...args: any[]) {
     if (typeof chunk === 'string') chunk = brandTerminalTitle(chunk);
     return (originalWrite as any).call(this, chunk, ...args);
   } as typeof process.stdout.write;

@@ -5,6 +5,20 @@ import { GeminiService } from '../gemini/gemini.ts';
 import { parseConfig } from '../config.ts';
 import { mergeEnv } from '../setup.ts';
 
+test('ChatGPT projects are listed across pages without modifying conversations', async () => {
+  const calls: string[] = [];
+  const fetcher: typeof fetch = async url => {
+    const u = new URL(String(url)); calls.push(u.pathname);
+    const items = u.searchParams.has('cursor')
+      ? [{ gizmo: { gizmo_type: 'snorlax', id: 'two', display: { name: 'Second' } } }]
+      : [{ gizmo: { gizmo_type: 'snorlax', id: 'one', display: { name: 'First' } } }, { gizmo: { gizmo_type: 'other', id: 'skip', display: { name: 'Other' } } }];
+    return new Response(JSON.stringify({ items, cursor: u.searchParams.has('cursor') ? null : 'next' }));
+  };
+  const client = new ChatGptService('test=cookie', 'test-agent', { fetcher });
+  assert.deepEqual(await client.listProjects(), [{ id: 'one', name: 'First' }, { id: 'two', name: 'Second' }]);
+  assert.deepEqual(calls, ['/backend-api/gizmos/snorlax/sidebar', '/backend-api/gizmos/snorlax/sidebar']);
+});
+
 test('ChatGPT sends a new message and continues the same conversation', async () => {
   const messages: string[] = [];
   const bodies: any[] = [];

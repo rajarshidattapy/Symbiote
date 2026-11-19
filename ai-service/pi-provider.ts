@@ -18,6 +18,7 @@ import { VERSION, type ExtensionAPI } from '../harness/packages/coding-agent/dis
 import { Image, getCapabilities, getPngDimensions } from '../harness/packages/tui/dist/index.js';
 import { loadSession, saveSession, sessionKey, withSessionLock, type SessionState } from './session.ts';
 import { setupSelectedModel } from './model-setup.ts';
+import { registerChatGptCommands } from './chatgpt/commands.ts';
 import { installTerminalTitleBranding } from './terminal-title.ts';
 
 const bridge = join(dirname(fileURLToPath(import.meta.url)), 'pi-bridge.ts');
@@ -200,6 +201,7 @@ export function streamSymbiote(model: Model<Api>, context: TranscriptContext, op
 }
 
 export default function (pi: ExtensionAPI) {
+  registerChatGptCommands(pi);
   if (process.stdout.isTTY) installTerminalTitleBranding();
   pi.on('model_select', async (event, ctx) => {
     const provider = event.model.id;
