@@ -1,0 +1,48 @@
+.chatgpt-profile/
+__pycache__/
+.venv/
+node_modules/
+.vendor/
+
+# Electron/Vite and packaging output.
+out/
+release/
+release-next/
+build/
+resources/
+graphify-out/
+
+# Local environment and credential files. Keep the checked-in template.
+.env
+.env-*
+!.env.example
+*.pem
+*.p12
+*.pfx
+node_modules/
+
+# OS/editor and runtime noise.
+*.log
+.DS_Store
+Thumbs.db
+
+# Private working evidence and generated packaging stamps.
+TODO.md
+CLAUDE_LIVE_FINDINGS.md
+TOOL_CALL_ISSUES.md
+TOOL_USABILITY_AUDIT.md
+bughunt-*/
+docs/evidence/
+docs/android-mcp-brainstorm/
+docs/handoff-*.md
+docs/open-issues-*.md
+HANDOFF.md
+smoke/
+smoke-switch.txt
+.tmp/
+one-cycle.ps1
+.one-cycle-*
+proof-*.txt
+outputs/
+.codex-remote-attachments/
+extension/build-stamp.txt
