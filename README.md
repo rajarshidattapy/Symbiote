@@ -6,19 +6,12 @@
 
 <p align="center"><strong>A local AI coding workspace: browser-connected, tool-capable, and built around your machine.</strong></p>
 
-<p align="center">
-  <img src="docs/banner.png" width="100%" alt="Symbiote banner" />
-</p>
-
 ## What it is
 
 Symbiote is an Electron coding workspace built on the Chat On Steroids desktop harness. It brings a ChatGPT browser workspace, a local MCP tool surface, approved-folder permissions, local terminal access, and optional direct web-session providers into one application.
 
 The app keeps local execution under your control: folders must be approved, mutable tools are capability-gated, and provider credentials stay local.
 
-<p align="center">
-  <img src="docs/arch.png" width="860" alt="Symbiote architecture" />
-</p>
 
 ## Components
 
@@ -50,7 +43,7 @@ Chat On Steroids / Symbiote
         |
         +-- Browser bridge + extension → ChatGPT web UI
         |
-        +-- Optional direct AI service → ChatGPT or Gemini web session
+        +-- Direct AI service(Optional) → ChatGPT or Gemini web session
 ```
 
 The direct backend currently exposes provider discovery and prompt delivery through fixed Electron IPC channels. It retains provider clients for continuation, especially for Gemini conversations. The existing browser route remains available and unchanged.
@@ -106,13 +99,6 @@ symbiote/
 ├── scripts/        # Build, packaging, verification, and release tooling
 └── test/           # App and integration tests
 ```
-
-## Security and limitations
-
-- Browser automation and web-session providers are experimental and can break when provider websites change.
-- The extension route and direct-provider route have different capabilities; using a direct provider does not itself grant the model MCP tool access.
-- Always review enabled capabilities and approved roots before allowing automated work.
-- A tunnel makes a local MCP endpoint reachable by the configured provider. Keep plugin URLs, tunnel IDs, and credentials private.
 
 ## Development notes
 
