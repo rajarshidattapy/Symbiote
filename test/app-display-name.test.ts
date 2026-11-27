@@ -32,27 +32,26 @@ it('renders production branding in all three HTML surfaces before any AppState a
   expect(document.title).toBe(APP_DISPLAY_NAME);
 });
 
-it.each(['en', 'ja', 'de', 'es', 'fr', 'ko', 'pt-BR', 'pt-PT', 'ru', 'tr', 'vi', 'zh-CN', 'zh-TW'] as const)('binds main-selected names through %s localization', async language => {
+it('binds main-selected names in the English-only interface', async () => {
   const i18n = await import('../src/renderer/i18n.js');
   const { applyAppBrand } = await import('../src/renderer/app-brand.js');
   i18n.initLanguage();
   expect(document.title).toBe(APP_DISPLAY_NAME);
   for (const displayName of [name, APP_DISPLAY_NAME] as const) {
-    applyAppBrand(displayName); i18n.setLanguage(language);
+    applyAppBrand(displayName); i18n.setLanguage('en');
     expect(document.title).toBe(displayName);
     expect(document.querySelector('.sidebar-brand strong')?.textContent).toBe(displayName);
     expect(document.querySelector('.chat-head .title')?.textContent).toContain(displayName);
     const { mainTexts } = await import('../src/renderer/main-texts.js');
     expect(mainTexts()[displayName]).toBe(displayName);
-    const catalog = language === 'en' ? null : JSON.parse(read(`src/renderer/locales/${language}.json`));
-    expect(mainTexts()[about]).toBe(catalog ? catalog[about] : about);
+    expect(mainTexts()[about]).toBe(about);
   }
 });
 
-it('registers display keys in every translated catalog and keeps English as source text', () => {
+it('registers display keys for the English-only interface', () => {
   for (const key of [name, APP_DISPLAY_NAME, about]) {
     expect(MAIN_TEXTS).toContain(key);
-    for (const language of ['ja', 'de', 'es', 'fr', 'ko', 'pt-BR', 'pt-PT', 'ru', 'tr', 'vi', 'zh-CN', 'zh-TW']) {
+    for (const language of [] as string[]) {
       const catalog = JSON.parse(read(`src/renderer/locales/${language}.json`));
       expect(Object.hasOwn(catalog, key)).toBe(true);
       expect(catalog[key]?.trim()).toBeTruthy();
@@ -108,11 +107,11 @@ it.each([
 });
 
 it('preserves literal package identity and the display-only state projection', () => {
-  expect(APP_DISPLAY_NAME).toBe('Chat On Steroids');
+  expect(APP_DISPLAY_NAME).toBe('Symbiote');
   const pkg = JSON.parse(read('package.json'));
   const builder = loadYaml(read('electron-builder.yml')) as Record<string, unknown>;
-  expect(pkg.name).toBe('chat-on-steroids'); expect(pkg.productName).toBeUndefined();
-  expect(builder.productName).toBe('Chat On Steroids'); expect(builder.appId).toBe('com.chatonsteroids.app');
+  expect(pkg.name).toBe('symbiote'); expect(pkg.productName).toBeUndefined();
+  expect(builder.productName).toBe('Symbiote'); expect(builder.appId).toBeUndefined();
   const main = read('src/main/index.ts');
   expect(read('src/main/ipc.ts')).toContain('displayName: appBrand.displayName');
   expect(read('src/renderer/main.ts')).toContain('applyAppBrand(next.displayName ?? APP_DISPLAY_NAME)');

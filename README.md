@@ -4,11 +4,11 @@
 
 <h1 align="center">Symbiote</h1>
 
-<p align="center"><strong>A local AI coding workspace: browser-connected, tool-capable, and built around your machine.</strong></p>
+<p align="center"><strong>A local AI coding workspace: cookie-session connected, tool-capable, and built around your machine.</strong></p>
 
 ## What it is
 
-Symbiote is an Electron coding workspace built on the Chat On Steroids desktop harness. It brings a ChatGPT browser workspace, a local MCP tool surface, approved-folder permissions, local terminal access, and optional direct web-session providers into one application.
+Symbiote is an Electron coding workspace with a local MCP tool surface, approved-folder permissions, local terminal access, and direct ChatGPT or Gemini web-session providers.
 
 The app keeps local execution under your control: folders must be approved, mutable tools are capability-gated, and provider credentials stay local.
 
@@ -18,15 +18,13 @@ The app keeps local execution under your control: folders must be approved, muta
 | Component | What it does | Status |
 | --- | --- | --- |
 | **Desktop harness** | The Electron workspace: chats, projects, local sessions, approved folders, tools, terminal, workers, plans, Goal/Loop flows, plugins, and MCP. | Available |
-| **Browser bridge + extension** | Connects the ChatGPT web interface to the local app, preserving browser-native conversations while allowing authorised local tool work. | Available; `extension/` is required for this route. |
-| **ChatGPT proxy** | Uses a local ChatGPT web session for the optional direct AI-service backend. | Experimental |
-| **Gemini proxy** | Uses a local Gemini web session for the optional direct AI-service backend. | Experimental |
+| **Direct AI service** | The only chat transport. Uses your local ChatGPT or Gemini web-session cookies and keeps a local transcript. | Available; text chat |
 | **Knowledge graph / Graphify** | The Graphify workstream for representing workspace context and relationships as a knowledge graph. | In development |
 | **RepoSync** | A separate local repository bridge for REST/OpenAPI-style consumers. | Experimental / standalone |
 
 ## Desktop harness features
 
-- ChatGPT browser workspace with durable local sessions and recorded tool results.
+- Direct ChatGPT or Gemini web-session workspace with durable local sessions and recorded replies.
 - Explicit project folders and approved-root boundaries.
 - Local MCP tools for files, search, terminal commands, browser work, and optional desktop control.
 - Public tunnel options for connecting ChatGPT plugins to the local MCP endpoint.

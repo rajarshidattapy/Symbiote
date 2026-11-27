@@ -29,8 +29,9 @@ describe('native window activation', () => {
     expect(options?.fullscreenable).toBe(platform === 'darwin');
     expect(options?.title).toBe('Chat On Steroids (dev)');
     expect(options?.webPreferences).toMatchObject({ sandbox: true, contextIsolation: true, nodeIntegration: false });
-    // macOS and Windows draw the app's own top bar as the title bar; Linux keeps its native frame.
-    expect(options?.titleBarStyle).toBe(platform === 'linux' ? undefined : 'hidden');
+    // macOS draws the app's own top bar; Windows keeps the native caption so its app icon sits
+    // beside the Symbiote window name. Linux also keeps its native frame.
+    expect(options?.titleBarStyle).toBe(platform === 'darwin' ? 'hidden' : undefined);
     if (platform === 'darwin') expect(options?.titleBarOverlay).toBe(true);
   });
 

@@ -1,7 +1,7 @@
 import { nativeTheme, type BrowserWindow } from 'electron';
 import { resolveTheme, type AppearanceTheme, type ThemeChoice } from '../shared/appearance.js';
 import type { UiPrefs } from '../shared/types.js';
-import { titleBarOverlayForTheme, windowBackgroundForTheme } from './window-layout.js';
+import { windowBackgroundForTheme } from './window-layout.js';
 
 /**
  * The theme the app shows now (#1914). "System" follows the operating system: Electron's own
@@ -11,11 +11,10 @@ export function shownTheme(choice: ThemeChoice | undefined): AppearanceTheme {
   return resolveTheme(choice, nativeTheme.shouldUseDarkColors === true);
 }
 
-/** The parts Electron draws in the theme shown now: window background and Windows title bar. */
+/** The Electron backing surface follows the rendered theme. */
 export function paintWindowTheme(ui: UiPrefs, win: BrowserWindow | null): void {
   const theme = shownTheme(ui.theme);
   if (win && !win.isDestroyed()) {
-    if (process.platform === 'win32') win.setTitleBarOverlay(titleBarOverlayForTheme(theme, ui.appearance));
     // BrowserWindow's native backing color is fixed at construction unless updated explicitly. An
     // old opposite background otherwise flashes behind the renderer while it paints again.
     win.setBackgroundColor(windowBackgroundForTheme(theme, ui.appearance));

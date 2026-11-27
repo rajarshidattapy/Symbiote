@@ -16,4 +16,10 @@ describe('native BrowserWindow icon policy', () => {
   it('does not impose a generated packaging path on Linux development runs', () => {
     expect(browserWindowIconPath('linux', false, '/electron/resources')).toBeUndefined();
   });
+
+  it('uses the checked-in Symbiote mark for a Windows development window', () => {
+    expect(browserWindowIconPath('win32', false, '/electron/resources', 'R:/symbiote')).toBe(
+      path.join('R:/symbiote', 'docs', 'logo_bgremoved.png')
+    );
+  });
 });

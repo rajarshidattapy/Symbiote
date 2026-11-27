@@ -9,9 +9,9 @@ import type { MainText } from '../shared/main-texts.js';
  */
 export function mainTexts(): Record<MainText, string> {
   return {
-    'Chat On Steroids (dev)': t('Chat On Steroids (dev)'),
-    'Chat On Steroids': t('Chat On Steroids'),
-    'About Chat On Steroids (dev)': t('About Chat On Steroids (dev)'),
+    'Symbiote (dev)': t('Symbiote (dev)'),
+    'Symbiote': t('Symbiote'),
+    'About Symbiote (dev)': t('About Symbiote (dev)'),
     'Open': t('Open'),
     'Show browser': t('Show browser'),
     'Hide browser': t('Hide browser'),

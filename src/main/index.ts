@@ -2,7 +2,6 @@ import { appBrand, refreshNativeBrand } from './app-brand.js';
 import { closeRemoteSessions } from './remote/ssh.js';
 import { sendDesktopInput, stopInputStartup } from './session/start-input.js';
 import { steerFromTelegram } from './telegram-steer.js';
-import { browserExtensionRequired } from '../shared/types.js';
 import { requestSessionFinishGoal, setFinishNotifier } from './session/finish.js';
 /**
  * Main process entry: window, tray, and the security posture for the renderer.
@@ -45,7 +44,7 @@ import { mainText, mainTextTranslations, onMainTextsChange, restoreMainTextTrans
 import { isMainText } from '../shared/main-texts.js';
 import { executableFingerprint, initKeychainNotice } from './keychain-notice.js';
 import { pluginManager } from './plugins/manager.js';
-import { onSessionAutomationChange, sessionActivityExpiresAt, sessionControlsFor, sessionHoldsTurn, setBrowserOpener, setBrowserWorkArea, setSessionAutomation, shutdownBridge, startBridge, stopSessionTurn } from './bridge.js';
+import { onSessionAutomationChange, sessionActivityExpiresAt, sessionControlsFor, sessionHoldsTurn, setBrowserOpener, setBrowserWorkArea, setSessionAutomation, shutdownBridge, stopBridge, stopSessionTurn } from './bridge.js';
 import { setStuckNotifier } from './stuck-notice.js';
 import { flushSessions, getSession, getSessionOrNullIfMissing, initSessionStore, listSessions, readRecentEvents, setRecordingStorageLimit } from './session/store.js';
 import { runDueSchedules, safeFailureReason, type RunnerDeps } from './scheduled-runs.js';
@@ -125,7 +124,7 @@ import { restoreManagedWorktrees } from './worktrees/index.js';
 import { applyStagedUpdate, ELEVATION_ANSWER_MS, installingVersion, onInstallerTakeover, onUpdateHandoffStep, startUpdateChecks } from './update.js';
 import { setUpdateProgressStep, showUpdateProgress, untilInstallerTakesOver } from './update-progress.js';
 import { resumeUpdateRefresh } from './update-all.js';
-import { UI_BASE_ZOOM, windowLayoutForDisplays, windowPlacementWasMaximized, titleBarOverlayForTheme, windowBackgroundForTheme } from './window-layout.js';
+import { UI_BASE_ZOOM, windowLayoutForDisplays, windowPlacementWasMaximized, windowBackgroundForTheme } from './window-layout.js';
 import { openInPreferredBrowser } from './browser.js';
 import { loadedCosBrowser, onCosBrowserLoaded, syncCosBrowser } from './cos-browser/selection.js';
 import {
@@ -179,7 +178,7 @@ function createWindow(): void {
     savedWindowBounds
   );
   const restoreMaximized = windowPlacementWasMaximized(savedWindowBounds);
-  const icon = browserWindowIconPath(process.platform, app.isPackaged, process.resourcesPath);
+  const icon = browserWindowIconPath(process.platform, app.isPackaged, process.resourcesPath, app.getAppPath());
   window = new BrowserWindow({
     ...layout,
     ...(icon ? { icon } : {}),
@@ -187,10 +186,8 @@ function createWindow(): void {
     fullscreenable: process.platform === 'darwin',
     show: false,
     autoHideMenuBar: true,
-    ...(process.platform === 'win32' ? {
-      titleBarStyle: 'hidden' as const,
-      titleBarOverlay: titleBarOverlayForTheme(shownTheme(getConfig().ui.theme), getConfig().ui.appearance)
-    } : {}),
+    // Use Windows' native caption: it places the Symbiote icon beside the window name, which
+    // makes the app identifiable in the title bar as well as the taskbar and Alt-Tab switcher.
     // macOS: the app's own top bar is the title bar, with the traffic lights inside it, instead
     // of a native title row above a second row that only held the sidebar and View buttons.
     // The overlay publishes the traffic-light area as env(titlebar-area-x) to the page.
@@ -864,13 +861,9 @@ void app.whenReady().then(async () => {
   // traffic, so never make startup/reload wait behind years of old session history.
   queueDeterministicAttributionRepair();
 
-  // Recording, workers and direct browser tools share one extension transport.
-  // ipc.ts uses the same eligibility rule when settings change.
-  // The CoS browser starts once the bridge listens: its extension looks for the app as soon as it
-  // loads, and a miss would leave it waiting for its next retry.
-  if (browserExtensionRequired(getConfig())) {
-    void startBridge().finally(() => void syncCosBrowser());
-  } else void syncCosBrowser();
+  // Chats use the direct cookie-session service. The legacy bridge and companion extension stay
+  // on disk for migration, but this process never starts their local server.
+  void stopBridge().finally(() => void syncCosBrowser());
   // Opt-in, and only once every fact it projects has been restored. ipc.ts starts and stops it
   // when the setting changes; a failed bind is logged and leaves the rest of the app untouched.
   if (getConfig().controlApi.enabled) {

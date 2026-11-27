@@ -32,7 +32,6 @@ import { refreshKeepAwake } from './keep-awake.js';
 import { getChatModels, startChatModelDiscovery, configureChatModelDiscovery } from './chat-models.js';
 import { releaseSessionFinish, requestSessionFinishGoal } from './session/finish.js';
 import { GOAL_MARKER_INSTRUCTION } from '../shared/goal-templates.js';
-import { validateInputImages } from './session/input-images.js';
 import { stageInputAttachment, stageInputAttachments, type AttachmentSource } from './session/input-attachments.js';
 import { recordDeliveredInput, recordedInputImage } from './session/input-history.js';
 import { UI_BASE_ZOOM } from './window-layout.js';
@@ -53,11 +52,12 @@ import { DEFAULT_PHONE_PUSH, type PhonePushSettings } from '../shared/phone-push
 import { retryGoalBrowserHelper } from './goal.js';
 import { requestBrowserPreferences } from './browser-preferences.js';
 import { cancelWebChatTitleCheck, readWebChatTitle } from './web-chat-title.js';
-import { sendDesktopInput, cancelDesktopInput, retryQueuedInputBrowser, retireDesktopOpening } from './session/start-input.js';
+import { cancelDesktopInput, retryQueuedInputBrowser, retireDesktopOpening } from './session/start-input.js';
 import { isSessionRemoving, withSessionRemoval } from './session/removal.js';
-import { wakeBrowserUrl } from './browser-startup.js';
 import { registerPluginIpc } from './plugins-ipc.js';
 import { registerAiServiceIpc } from './ai-service-ipc.js';
+import { DirectAiBackend } from './ai-service-backend.js';
+import { sendDirectChat } from './direct-chat-session.js';
 import { assignChatGroup, chatGroupsState, createChatGroup, deleteChatGroup, forgetChatGroupMember, renameChatGroup } from './chat-groups.js';
 import { confirmedPluginSchemas, pluginRefreshPublications, pluginRefreshStatuses, onPluginRefreshChange, pluginRefreshUnreadable, resetPluginRefreshLedger } from './plugin-refresh.js';
 /**
@@ -77,7 +77,6 @@ import { testLinuxScreenshotConsent } from './computer/linux-screenshot-consent.
 import { z } from 'zod';
 import {
   CAPABILITIES,
-  browserExtensionRequired,
   CHAT_BROWSERS,
   GOAL_MODES,
   GOAL_PROVIDERS,
@@ -134,7 +133,6 @@ import {
   revealChatInBrowser,
   pendingCommands,
   onBridgeChange,
-  startBridge,
   stopBridge,
   sweepStaleSwarm,
   unpair,
@@ -809,6 +807,10 @@ export function personsMessage(entry: InputEntry): boolean {
 }
 
 export function registerIpc(getWindow: () => BrowserWindow | null, quitToInstall: () => void): void {
+  // The cookie-backed web-session client is the only chat transport. It is deliberately shared
+  // with the optional direct-service IPC surface, so provider sessions are not duplicated.
+  const directAiBackend = new DirectAiBackend();
+  registerAiServiceIpc(handle, directAiBackend);
   registerWorkspaceTerminalIpc(getWindow);
   registerAgentOutputIpc(getWindow);
   registerDictationIpc(getWindow);
@@ -1024,7 +1026,9 @@ export function registerIpc(getWindow: () => BrowserWindow | null, quitToInstall
     };
     // Recording, workers and direct browser tools share the same extension transport.
     // Startup and settings saves use one eligibility rule.
-    await step(() => browserExtensionRequired(next) ? startBridge() : stopBridge());
+    // Direct cookie sessions are the only chat transport. Never revive the legacy extension
+    // bridge while applying unrelated settings.
+    await step(() => stopBridge());
     if (before.ui.chatBrowser !== next.ui.chatBrowser) await step(syncCosBrowser);
     if (before.capabilities.screen !== next.capabilities.screen || before.capabilities.control !== next.capabilities.control || before.readOnly !== next.readOnly) wakeBrowserWork('browser-control');
     // Permissions and the second tunnel id both decide whether the optional Desktop
@@ -2269,8 +2273,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null, quitToInstall
   handle('sessions:send', async (payload) => {
     // Where a message came from is main's to say: the window never marks one as from Telegram.
     const { via: _via, ...input } = inputArgs.parse(payload);
-    await validateInputImages(input.images ?? []);
-    return sendDesktopInput(input);
+    return sendDirectChat(directAiBackend, input);
   });
   handle('sessions:outbox', async () => (await listInputs()).filter((row) => row.purpose !== 'decision'));
   handle('sessions:reorderInputs', async (payload) => {
@@ -2831,13 +2834,8 @@ export function registerIpc(getWindow: () => BrowserWindow | null, quitToInstall
     recoveryAllowed: recoveryInputAllowed,
     callsHoldRecovery: recoveryHeldByCalls,
     activity: sessionInputActivity,
-    wakeDecision: async (entry, signal) => {
-      signal.throwIfAborted();
-      if (!await startBridge()) throw new Error('The browser bridge could not start');
-      signal.throwIfAborted();
-      const marker = `cos-input=${encodeURIComponent(entry.id)}`;
-      await wakeBrowserUrl(entry.conversationId ? `https://chatgpt.com/c/${encodeURIComponent(entry.conversationId)}`
-        : `https://chatgpt.com/?${entry.lifetime === 'temporary-planner' ? 'temporary-chat=true&' : ''}${marker}#${marker}`);
+    wakeDecision: async () => {
+      throw new Error('Queued browser delivery is unavailable: Symbiote uses direct AI sessions.');
     },
     bindHelper: async (conversationId, fromSessionId) => {
       const source = fromSessionId ? await getSession(fromSessionId) : null;
@@ -2915,7 +2913,6 @@ export function registerIpc(getWindow: () => BrowserWindow | null, quitToInstall
   // A creation armed before the app last quit becomes uncertain on time, not on the browser's next pass.
   void expireArmedProjectCreates().catch(() => undefined);
   registerPluginIpc(handle, getWindow, pushState);
-  registerAiServiceIpc(handle);
   // Draft stages belong to session controls; state:changed only refreshes settings.
   onGoalChange(() => push('session:changed'));
   handle('tasks:cancel', async payload => cancelTaskRequest(z.object({ requestId: z.string().uuid() }).parse(payload).requestId));
@@ -2932,15 +2929,8 @@ export function registerIpc(getWindow: () => BrowserWindow | null, quitToInstall
       return drafted;
     }, publish);
   });
-  configureChatModelDiscovery({ changed: () => push('chatModels:changed', getChatModels()), wake: async (nonce, allowOpen) => {
-    if (!await startBridge()) throw new Error('The browser bridge could not start');
-    if (allowOpen) {
-      await wakeBrowserUrl(`https://chatgpt.com/?cos-model-catalog=${nonce}`, true, true);
-      // The approval prompt it describes comes with ChatGPT's first Core tool call, which needs a Core
-      // tunnel. On a fresh install, discovery opened ChatGPT before any of that existed and the
-      // reminder read "One last step" at step 0 of 6; Setup's last card keeps it until then.
-      if (getConfig().tunnel.tunnelId.trim()) push('setup:toolApprovalNotice');
-    }
+  configureChatModelDiscovery({ changed: () => push('chatModels:changed', getChatModels()), wake: async () => {
+    throw new Error('ChatGPT browser model discovery is unavailable with direct AI sessions.');
   } });
   onUpdateChange(pushState);
   onMacOSDesktopAccessChange(pushState);
