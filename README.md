@@ -14,6 +14,10 @@ Symbiote connects web-based AI services like ChatGPT and Gemini to a local codin
 
 It combines unofficial web-session adapters with [Pi](https://github.com/earendil-works/pi), giving conversational AI access to your local codebase through a unified terminal interface.
 
+## Monorepo layout
+
+This repository now holds three projects: `chat-on-steroids/` (core app), `symbiote-harness/` (the terminal harness below) and `repsyn/` (live repo bridge). See [docs/architecture.md](docs/architecture.md). The sections below describe the harness.
+
 ## Project Structure
 
 ```
