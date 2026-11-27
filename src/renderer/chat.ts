@@ -1492,7 +1492,7 @@ let renaming: { id: string; original: string; value: string; start: number; end:
 /** Slash commands that act on the open chat; New Chat does not offer them. */
 const CHAT_COMMANDS = new Set(['rename', 'pin', 'status', 'compact', 'copy', 'export', 'share', 'find']);
 /** The commands that switch how the next message is sent; their rest is that message. */
-const MODE_COMMANDS = new Set(['plan', 'goal', 'loop']);
+const MODE_COMMANDS = new Set(['plan']);
 /** The draft a typed /image is being sent from (#1701): that one message asks for a picture. */
 let pictureRequestFor: string | null = null;
 
@@ -1500,11 +1500,6 @@ let pictureRequestFor: string | null = null;
 function runComposerCommand(name: string): void {
   if (name === 'plan') { $('createPlan').click(); return; }
   if (name === 'compact') { $('compactSession').click(); return; }
-  if (name === 'goal' || name === 'loop') {
-    const automation = $<HTMLSelectElement>('chatAutomation'); automation.value = name;
-    automation.dispatchEvent(new Event('change', { bubbles: true }));
-    return;
-  }
   runSlashCommand(name);
 }
 

@@ -384,7 +384,7 @@ $('sidebarConnection').addEventListener('contextmenu', event => {
   event.preventDefault();
   setConnectionPopover(true);
 });
-$('chatSettingsBtn').addEventListener('click', () => showTab('agents-goal'));
+$('chatSettingsBtn').addEventListener('click', () => showTab('agents-models'));
 $('sessionList').addEventListener('click', event => {
   if ((event.target as HTMLElement).closest('[data-id], [data-new-project]')) showTab('chat');
 }, { capture: true });

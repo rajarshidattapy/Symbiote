@@ -59,18 +59,10 @@
         <button data-tab="appearance" type="button"><i class="ico ph ph-sun" aria-hidden="true"></i>Appearance</button>
         <div class="tabs-group" role="group" aria-labelledby="tabsAgentsLabel">
           <span class="tabs-group-label" id="tabsAgentsLabel">Agents</span>
-          <button data-tab="agents-goal" type="button"><i class="ico ph ph-arrows-clockwise" aria-hidden="true"></i>Goal &amp; Loop</button>
           <button data-tab="agents-models" type="button"><i class="ico ph ph-brain" aria-hidden="true"></i>Models</button>
-          <button data-tab="agents-workers" type="button"><i class="ico ph ph-robot" aria-hidden="true"></i>Workers</button>
           <button data-tab="agents-tools" type="button"><i class="ico ph ph-shield-check" aria-hidden="true"></i>Tools &amp; access</button>
           <button data-tab="agents-browser" type="button"><i class="ico ph ph-globe-hemisphere-west" aria-hidden="true"></i>Browser</button>
-        </div>
-        <div class="tabs-group" role="group" aria-labelledby="tabsInsightLabel">
-          <span class="tabs-group-label" id="tabsInsightLabel">Insight</span>
           <button data-tab="usage" type="button"><i class="ico ph ph-chart-line" aria-hidden="true"></i>Usage</button>
-          <button data-tab="activity" type="button">
-            <i class="ico ph ph-activity" aria-hidden="true"></i>Activity
-          </button>
         </div>
       </nav>
         <section class="sidebar-sessions">
@@ -1016,7 +1008,7 @@
                 three overlapping ones. The pairing instructions moved into Setup, where
                 the rest of the once-only work already lives.
               -->
-              <div class="view settings-page-content automation-content" data-view="settings" data-agents-current="goal" hidden>
+              <div class="view settings-page-content automation-content" data-view="settings" data-agents-current="models" hidden>
                 <header class="settings-page-head automation-page-head" data-agents-page="goal"><div><h1>Goal &amp; Loop</h1><p>How chats keep going on their own, and what the app says when it continues.</p></div></header>
                 <header class="settings-section-head automation-section-head" data-agents-page="goal"><div><h2 class="settings-section-title">Unfinished answers</h2><p>When a chat stops mid-answer, the app can continue it for you.</p></div></header>
                 <div class="settings-surface pane" data-agents-page="goal">
@@ -1145,12 +1137,12 @@
 
                   </div>
 
-                <header class="settings-page-head automation-page-head" data-agents-page="models"><div><h1>Models</h1><p>Which models chats, sub-agents and the API provider use.</p></div></header>
-                <header data-agents-page="models" class="settings-section-head automation-section-head"><div><h2 class="settings-section-title">ChatGPT models</h2><p>Choose the default model and reasoning for new chats and sub-agents, from what your account offers.</p></div></header>
+                <header class="settings-page-head automation-page-head" data-agents-page="models"><div><h1>Models</h1><p>Choose the model and reasoning used for new chats.</p></div></header>
+                <header data-agents-page="models" class="settings-section-head automation-section-head"><div><h2 class="settings-section-title">ChatGPT models</h2><p>Choose the default model and reasoning for new chats from what your account offers.</p></div></header>
                 <div data-agents-page="models" class="settings-surface pane">
                   <div class="setting"><span class="setting-text"><b>Available ChatGPT models</b><em id="chatModelStatus">Read model choices from your account.</em></span><button class="btn" id="refreshChatModels" type="button">Refresh</button></div>
                   <div class="setting"><span class="setting-text"><b id="defaultChatModelTitle">Default new-chat model</b><em>Used when you start a new chat. A chat you continue keeps its own model.</em></span><select id="defaultChatModel" aria-labelledby="defaultChatModelTitle"><option value="">Automatic</option></select></div>
-                  <div class="setting"><span class="setting-text"><b id="defaultChatReasoningTitle">Default new-chat reasoning</b><em>Used with the ordinary chat model above; workers and helpers keep their own defaults.</em></span><select id="defaultChatReasoning" aria-labelledby="defaultChatReasoningTitle"><option value="">Automatic</option></select></div>
+                  <div class="setting"><span class="setting-text"><b id="defaultChatReasoningTitle">Default new-chat reasoning</b><em>Used with the ordinary chat model above.</em></span><select id="defaultChatReasoning" aria-labelledby="defaultChatReasoningTitle"><option value="">Automatic</option></select></div>
                   <div class="setting"><span class="setting-text"><b id="workerModelTitle">Default sub-agent model</b><em>Used when a sub-agent starts. The app checks it in ChatGPT first.</em></span><select id="workerModel" aria-labelledby="workerModelTitle"><option value="" disabled>No observed choices</option></select></div>
                   <div class="setting"><span class="setting-text"><b id="workerReasoningTitle">Default sub-agent reasoning</b><em>Used with the sub-agent model above.</em></span><select id="workerReasoning" aria-labelledby="workerReasoningTitle"><option value="" disabled>No observed choices</option></select></div>
                   </div>
@@ -1461,8 +1453,6 @@
                     <div class="composer-popover">
                       <div class="automation-switch" id="automationSwitch" role="radiogroup" aria-label="Chat mode">
                         <button type="button" role="radio" aria-checked="true" data-mode="off"><i class="ico ph ph-chat-circle" aria-hidden="true"></i><span class="mode-copy"><span>Normal</span><small>One request, without automatic continuation.</small></span><i class="ico ph ph-check mode-check" aria-hidden="true"></i></button>
-                        <div class="mode-option"><button type="button" role="radio" aria-checked="false" data-mode="goal"><i class="ico ph ph-target" aria-hidden="true"></i><span class="mode-copy"><span>Goal</span><small>Continue until this objective is satisfied.</small></span><i class="ico ph ph-check mode-check" aria-hidden="true"></i></button><button type="button" class="mode-edit" data-edit-mode="goal" data-keep-menu="true" aria-label="Edit task" title="Edit task"><i class="ico ph ph-pencil-simple" aria-hidden="true"></i></button></div>
-                        <div class="mode-option"><button type="button" role="radio" aria-checked="false" data-mode="loop"><i class="ico ph ph-arrows-clockwise" aria-hidden="true"></i><span class="mode-copy"><span>Loop</span><small>Keep working within the brief until paused.</small></span><i class="ico ph ph-check mode-check" aria-hidden="true"></i></button><button type="button" class="mode-edit" data-edit-mode="loop" data-keep-menu="true" aria-label="Edit task" title="Edit task"><i class="ico ph ph-pencil-simple" aria-hidden="true"></i></button></div>
                         </div><select hidden id="chatAutomation" aria-label="Chat automation"><option value="off">Off</option><option value="goal">Goal</option><option value="loop">Loop</option></select>
                       <label id="loopDeliveryRow" hidden>When to continue<select id="loopDelivery"><option value="finish">Session Finish only</option><option value="after-turn">Also after the turn</option></select></label>
               <div id="sessionControls" hidden>

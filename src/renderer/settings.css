@@ -285,6 +285,11 @@
 .automation-content[data-agents-current="workers"] > :is([data-agents-page="goal"],[data-agents-page="models"],[data-agents-page="tools"],[data-agents-page="browser"]) { display: none; }
 .automation-content[data-agents-current="tools"] > :is([data-agents-page="goal"],[data-agents-page="models"],[data-agents-page="workers"],[data-agents-page="browser"]) { display: none; }
 .automation-content[data-agents-current="browser"] > :is([data-agents-page="goal"],[data-agents-page="models"],[data-agents-page="workers"],[data-agents-page="tools"]) { display: none; }
+/* Retain old controls for existing sessions/configuration, without exposing retired automation. */
+.automation-content [data-agents-page="models"] > .setting:has(#workerModel),
+.automation-content [data-agents-page="models"] > .setting:has(#workerReasoning),
+.automation-content > header[data-agents-page="models"]:has(#goalProviderTitle),
+.automation-content > .settings-surface[data-agents-page="models"]:has(#goalProvider) { display: none; }
 
 .automation-section-head { margin-top: 32px; }
 .automation-page-head + .automation-section-head { margin-top: 0; }

@@ -4443,6 +4443,8 @@ select option::checkmark { order: 1; margin-inline-start: auto; color: var(--ink
 #composerSettings .composer-popover { width: 350px; max-width: calc(100vw - 32px); left: 0; right: auto; transform-origin: bottom left; max-height: min(520px, 70vh); overflow-y: auto; }
 #composerSettings.mode-picker :is(#sessionControls, #loopDeliveryRow) { display: none; }
 #composerSettings:not(.mode-picker) #automationSwitch { display: none; }
+/* Goal, Loop and task controls remain in the DOM only to render old sessions safely. */
+#sessionControls, #loopDeliveryRow, #generateFinishGoal, #activeGoalRow, #goalLifecycle { display: none !important; }
 #composerSettings[data-mode]:not([data-mode=off]) > summary { color: var(--accent); background: var(--control-selected); }
 #automationSwitch { display: flex; flex-direction: column; gap: 2px; padding: 0; background: transparent; }
 #automationSwitch button { justify-content: flex-start; padding: 10px; gap: 10px; box-shadow: none; background: transparent; transition: none; }

@@ -4,9 +4,11 @@
  * page, so a remembered or documented link keeps working.
  */
 export const AGENT_PAGES: Readonly<Record<string, string>> = {
-  'agents-goal': 'goal', 'agents-models': 'models', 'agents-workers': 'workers', 'agents-tools': 'tools', 'agents-browser': 'browser'
+  // Goal/Loop and Workers were removed from the visible Agents settings. Keep their old deep
+  // links usable by taking people to the first remaining Agents page.
+  'agents-goal': 'models', 'agents-models': 'models', 'agents-workers': 'models', 'agents-tools': 'tools', 'agents-browser': 'browser'
 };
-const LEGACY_TABS: Readonly<Record<string, string>> = { settings: 'agents-goal' };
+const LEGACY_TABS: Readonly<Record<string, string>> = { settings: 'agents-models', activity: 'usage' };
 
 /** The tab a request names today, and the Agents page it shows (none for any other tab). */
 export function resolveSettingsTab(requested: string): { tab: string; agentPage: string | undefined } {
