@@ -1,0 +1,795 @@
+import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { randomUUID } from 'node:crypto';
+import { bindBrowserInputProject, claimBrowserInput, enqueueInput, listInputs, pendingBrowserInputs, resetInputForTests } from '../src/main/session/input.js';
+import { defaultConfig, initConfigPath, saveConfig } from '../src/main/config.js';
+import { flushDurable, initDurableStore, resetDurableForTests, writeDurableNow } from '../src/main/durable.js';
+import { createSession, getSession, initSessionStore, moveSessionProject, rebindSession, resetSessionStoreForTests, setSessionOrigin } from '../src/main/session/store.js';
+import { addProject, armProjectCreate, assignSessionProject, bindChatToLinkedProject, claimProjectCreate, completeProjectCreate, failProjectCreate, getProject, getSessionProject, inheritSessionProject, listProjects, markProjectGone, moveChatToProject, moveChatWithGroup, pendingProjectCreates, PROJECT_CREATE_ARMED_MS, PROJECT_CREATE_CLAIM_MS, projectWorkspace, removeProject, retryProjectCreate, sessionSecretsShieldOff, setProjectColor, setProjectSecretsShieldOff } from '../src/main/projects.js';
+import { validateNewRoot } from '../src/main/sandbox.js';
+import { resetWorkspaces, setWorkspaceFor } from '../src/main/workspace.js';
+import { onLog } from '../src/main/logger.js';
+
+let directory: string, approved: string;
+beforeEach(async () => {
+  resetInputForTests();
+  directory = await fs.mkdtemp(path.join(os.tmpdir(), 'cos-projects-'));
+  approved = path.join(directory, 'approved');
+  await fs.mkdir(path.join(approved, 'first'), { recursive: true });
+  await fs.mkdir(path.join(approved, 'second'));
+  // Match IPC root approval: macOS temp paths can use /var while their canonical
+  // authority is /private/var. Stored root identity must already be canonical.
+  approved = await validateNewRoot(approved, []);
+  initConfigPath(directory); initDurableStore(directory); initSessionStore(directory);
+  await saveConfig({ ...defaultConfig(), roots: [{ name: 'work', path: approved }] });
+});
+afterEach(async () => { resetSessionStoreForTests(); resetDurableForTests(); await fs.rm(directory, { recursive: true, force: true }); });
+
+it('persists one project per canonical directory and validates approved directories', async () => {
+  const [one, again] = await Promise.all([addProject(path.join(approved, 'first')), addProject(path.join(approved, 'first'))]);
+  expect(again.id).toBe(one.id);
+  expect(await listProjects()).toEqual([one]);
+  await fs.writeFile(path.join(approved, 'file.txt'), 'x');
+  await expect(addProject(path.join(approved, 'file.txt'))).rejects.toThrow(/folder/);
+  await expect(addProject(directory)).rejects.toThrow();
+  await expect(addProject('first')).rejects.toThrow(/absolute/);
+  resetDurableForTests(); initDurableStore(directory);
+  expect(await listProjects()).toEqual([one]);
+});
+
+it('persists only predefined presentation colors without changing project workspace authority', async () => {
+  const project = await addProject(path.join(approved, 'first'));
+  const colored = await setProjectColor(project.id, 'purple');
+  expect(colored).toEqual({ ...project, color: 'purple' });
+  expect(await projectWorkspace(project.id)).toMatchObject({ real: project.path, virtual: '/work/first' });
+  resetDurableForTests(); initDurableStore(directory);
+  expect(await listProjects()).toEqual([colored]);
+  await expect(setProjectColor(project.id, 'chartreuse' as any)).rejects.toThrow();
+  expect(await setProjectColor(project.id, null)).toEqual(project);
+});
+
+it.each(['', '{"unfinished":', 'null'])('keeps an unreadable project catalog intact (%j)', async damaged => {
+  const project = await addProject(path.join(approved, 'first'));
+  const session = await createSession({ title: 'Existing project chat' });
+  await assignSessionProject(session.id, project.id);
+  const file = path.join(directory, 'state', 'projects.json');
+  const saved = await fs.readFile(file, 'utf8');
+  await fs.writeFile(file, damaged);
+  resetDurableForTests(); initDurableStore(directory);
+  await expect(listProjects()).rejects.toThrow('Project catalog is invalid');
+  await expect(addProject(path.join(approved, 'second'))).rejects.toThrow('Project catalog is invalid');
+  await flushDurable();
+  expect(await fs.readFile(file, 'utf8')).toBe(damaged);
+  // Restoring the previous version's catalog recovers the original binding, not a new UUID.
+  await fs.writeFile(file, saved);
+  expect(await listProjects()).toEqual([project]);
+  expect(await getSessionProject(session.id)).toMatchObject({ real: project.path });
+});
+
+it('does not replace valid projects after a transient catalog read error', async () => {
+  const project = await addProject(path.join(approved, 'first'));
+  const file = path.join(directory, 'state', 'projects.json');
+  const saved = await fs.readFile(file, 'utf8');
+  const read = vi.spyOn(fs, 'readFile').mockRejectedValueOnce(Object.assign(new Error('read failed'), { code: 'EIO' }));
+  try {
+    await expect(addProject(path.join(approved, 'second'))).rejects.toThrow('Project catalog is invalid');
+  } finally { read.mockRestore(); }
+  await flushDurable();
+  expect(await fs.readFile(file, 'utf8')).toBe(saved);
+  expect(await listProjects()).toEqual([project]);
+});
+
+it('still treats an absent catalog as a fresh installation', async () => {
+  expect(await listProjects()).toEqual([]);
+  const project = await addProject(path.join(approved, 'first'));
+  expect(await listProjects()).toEqual([project]);
+});
+
+it.each(['invalid row', 'duplicate ID', 'unreadable JSON'])(
+  'logs one content-free warning when refusing a catalog with %s', async reason => {
+    const project = await addProject(path.join(approved, 'first'));
+    const row = { ...project, name: 'catalog-content-marker' };
+    const raw = reason === 'invalid row' ? [{ ...row, id: 'invalid' }] : [row, row];
+    await writeDurableNow('projects', raw);
+    if (reason === 'unreadable JSON') await fs.writeFile(path.join(directory, 'state', 'projects.json'), '{"catalog-content-marker":');
+    const warnings: string[] = [];
+    const stop = onLog(entry => { if (entry.level === 'warn') warnings.push(entry.message); });
+    try {
+      await expect(listProjects()).rejects.toThrow('Project catalog is invalid');
+      expect(warnings).toEqual([reason === 'unreadable JSON'
+        ? 'projects: refused to read or change the catalog because its saved state is unreadable'
+        : 'projects: refused to read or change the catalog because its saved rows are invalid or duplicated']);
+    } finally { stop(); }
+  }
+);
+
+it('turns the secrets shield off for one project\'s chats only, durably (#1797)', async () => {
+  const project = await addProject(path.join(approved, 'first'));
+  const other = await addProject(path.join(approved, 'second'));
+  const inside = await createSession({ title: 'Inside', conversationId: 'inside-conversation' });
+  const elsewhere = await createSession({ title: 'Elsewhere', conversationId: 'elsewhere-conversation' });
+  const loose = await createSession({ title: 'No project', conversationId: 'loose-conversation' });
+  await assignSessionProject(inside.id, project.id);
+  await assignSessionProject(elsewhere.id, other.id);
+  expect(await sessionSecretsShieldOff(inside.id)).toBe(false);
+  const off = await setProjectSecretsShieldOff(project.id, true);
+  expect(off).toEqual({ ...project, secretsShieldOff: true });
+  expect(await sessionSecretsShieldOff(inside.id)).toBe(true);
+  expect(await sessionSecretsShieldOff(elsewhere.id)).toBe(false);
+  expect(await sessionSecretsShieldOff(loose.id)).toBe(false);
+  expect(await sessionSecretsShieldOff(randomUUID())).toBe(false);
+  resetDurableForTests(); initDurableStore(directory);
+  expect((await listProjects()).find(row => row.id === project.id)).toEqual(off);
+  // On again leaves no flag behind, so the saved project looks as it did before.
+  expect(await setProjectSecretsShieldOff(project.id, false)).toEqual(project);
+  expect(await setProjectSecretsShieldOff(project.id, false)).toEqual(project);
+  await expect(setProjectSecretsShieldOff(randomUUID(), true)).rejects.toThrow(/not found/);
+  // A hand-edited `false` is simply on; it never makes the project list unreadable.
+  await writeDurableNow('projects', [{ ...project, secretsShieldOff: false }]);
+  expect(await sessionSecretsShieldOff(inside.id)).toBe(false);
+  expect((await listProjects())[0]!.id).toBe(project.id);
+});
+
+// A read-only folder stops the write; root and Windows ignore that mode, so the test does not apply there.
+it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)('never lets a failed shield switch land later through the store\'s retry', async () => {
+  const project = await addProject(path.join(approved, 'first'));
+  const store = (await fs.readdir(directory)).includes('state') ? path.join(directory, 'state') : directory;
+  await fs.chmod(store, 0o500);
+  try {
+    await expect(setProjectSecretsShieldOff(project.id, true)).rejects.toThrow();
+  } finally { await fs.chmod(store, 0o700); }
+  await flushDurable();
+  resetDurableForTests(); initDurableStore(directory);
+  expect((await listProjects())[0]).toEqual(project);
+});
+
+it('resolves a native picker alias to the approved identity without granting outside aliases', async () => {
+  const alias = path.join(directory, 'picker-alias');
+  await fs.symlink(approved, alias, process.platform === 'win32' ? 'junction' : 'dir');
+  const project = await addProject(path.join(alias, 'first'));
+  expect(project.path).toBe(path.join(approved, 'first'));
+  expect((await addProject(path.join(approved, 'first'))).id).toBe(project.id);
+  const outside = path.join(directory, 'outside');
+  await fs.mkdir(outside);
+  const outsideAlias = path.join(approved, 'outside-alias');
+  await fs.symlink(outside, outsideAlias, process.platform === 'win32' ? 'junction' : 'dir');
+  await expect(addProject(outsideAlias)).rejects.toThrow(/escapes|not inside/);
+});
+
+it('removes a grouping durably while preserving files, conversations and pending browser claims', async () => {
+  const project = await addProject(path.join(approved, 'first'));
+  const other = await addProject(path.join(approved, 'second'));
+  const session = await createSession({ title: 'Keep this chat', conversationId: 'retained-conversation' });
+  await assignSessionProject(session.id, project.id);
+  const file = path.join(project.path, 'keep.txt');
+  await fs.writeFile(file, 'keep');
+  const input = await enqueueInput({ id: randomUUID(), projectId: project.id, sessionId: null, text: 'Queued work', dueAt: 0, mode: 'auto', model: null, reasoningEffort: null });
+  await Promise.all([removeProject(project.id), removeProject(project.id)]);
+  resetDurableForTests(); initDurableStore(directory); resetInputForTests(); resetSessionStoreForTests();
+  expect(await listProjects()).toEqual([{ ...project, ungrouped: true }, other]);
+  expect((await getSession(session.id))?.title).toBe('Keep this chat');
+  expect(await getSessionProject(session.id)).toMatchObject({ virtual: '/work/first' });
+  expect(await fs.readFile(file, 'utf8')).toBe('keep');
+  expect(await claimBrowserInput(input.id, 'document', null)).toMatchObject({ id: input.id });
+  expect(await bindBrowserInputProject(input.id, 'document', 'queued-conversation')).toBe(true);
+  await expect(removeProject(randomUUID())).rejects.toThrow('Project not found');
+  expect(await addProject(project.path)).toEqual(project);
+  expect(await listProjects()).toEqual([project, other]);
+});
+
+it('binds a claimed fresh input before evidence without acknowledging delivery or accepting another document', async () => {
+  const project = await addProject(path.join(approved, 'first'));
+  const entry = await enqueueInput({ id: randomUUID(), projectId: project.id, sessionId: null, text: 'Work here', dueAt: 0, mode: 'auto', model: null, reasoningEffort: null });
+  expect(await bindBrowserInputProject(entry.id, 'document', 'conversation-one')).toBe(false);
+  expect(await claimBrowserInput(entry.id, 'document', null)).toMatchObject({ projectId: project.id });
+  expect(await bindBrowserInputProject(entry.id, 'wrong-document', 'conversation-one')).toBe(false);
+  expect(await bindBrowserInputProject(entry.id, 'document', 'conversation-one')).toBe(true);
+  const bound = (await listInputs()).find(row => row.id === entry.id)!;
+  expect(bound.state).toBe('browser');
+  expect(bound.deliveredSessionId).toBeUndefined();
+  expect((await getSession(bound.sessionId!))?.projectId).toBe(project.id);
+  resetInputForTests();
+  expect(await bindBrowserInputProject(entry.id, 'document', 'conversation-one')).toBe(true);
+  expect(await bindBrowserInputProject(entry.id, 'document', 'conversation-two')).toBe(false);
+  expect(await rebindSession(bound.sessionId!, 'conversation-one', 'conversation-replacement')).toBe(true);
+  expect(await bindBrowserInputProject(entry.id, 'document', 'conversation-one')).toBe(false);
+});
+
+it('retains project ownership through restart, resume and exact worker origins', async () => {
+  const project = await addProject(path.join(approved, 'first'));
+  const otherProject = await addProject(path.join(approved, 'second'));
+  const prime = await createSession({ title: 'Prime', conversationId: 'prime-original' });
+  await assignSessionProject(prime.id, project.id);
+  await expect(assignSessionProject(prime.id, otherProject.id)).rejects.toThrow(/another project/);
+  const origin = { kind: 'worker' as const, fromSessionId: prime.id, agentId: 'worker-1', task: 'Inspect' };
+  const worker = await createSession({ title: 'Worker', origin, conversationId: 'worker-original' });
+  expect(worker.projectId).toBe(project.id);
+  const late = await createSession({ title: 'Late origin' });
+  await setSessionOrigin(late.id, origin, 'Worker');
+  expect((await getSession(late.id))?.projectId).toBe(project.id);
+  const exact = await createSession({ title: 'Exact inheritance' });
+  await inheritSessionProject(exact.id, 'prime-original');
+  expect((await getSession(exact.id))?.projectId).toBe(project.id);
+  await rebindSession(prime.id, 'prime-original', 'prime-replacement');
+  resetSessionStoreForTests();
+  expect((await getSession(prime.id))?.projectId).toBe(project.id);
+  expect(await getSessionProject(prime.id)).toMatchObject({ virtual: '/work/first' });
+  const stale = await createSession({ title: 'Stale source' });
+  await inheritSessionProject(stale.id, 'prime-original');
+  expect((await getSession(stale.id))?.projectId).toBeUndefined();
+});
+
+it('fails closed when explicit project permission is removed and follows approved root renames', async () => {
+  const project = await addProject(path.join(approved, 'first'));
+  const session = await createSession({ title: 'Bound' });
+  await assignSessionProject(session.id, project.id);
+  await saveConfig({ ...defaultConfig(), roots: [{ name: 'renamed', path: approved }] });
+  expect(await getSessionProject(session.id)).toMatchObject({ virtual: '/renamed/first' });
+  await saveConfig({ ...defaultConfig(), roots: [] });
+  await expect(getSessionProject(session.id)).rejects.toThrow();
+  expect((await getSession(session.id))?.projectId).toBe(project.id);
+});
+
+// #1176: a new CoS project's native ChatGPT Project, from request to verified identity.
+const nativeId = `g-p-${'a'.repeat(32)}`;
+it('requests a native ChatGPT Project only for a project created here, not for an existing or restored one', async () => {
+  const project = await addProject(path.join(approved, 'first'));
+  expect(project.chatgpt).toMatchObject({ state: 'requested' });
+  expect(await pendingProjectCreates()).toEqual([{ id: (project.chatgpt as { requestId: string }).requestId, projectId: project.id, name: 'first', state: 'requested' }]);
+  // An older catalog row has none, and restoring an ungrouped one does not invent one.
+  const { chatgpt: _, ...legacy } = project;
+  await removeProject(project.id);
+  const raw = (await listProjects()).map(row => ({ ...legacy, ungrouped: row.ungrouped }));
+  await (await import('../src/main/durable.js')).writeDurableNow('projects', raw);
+  expect((await addProject(path.join(approved, 'first'))).chatgpt).toBeUndefined();
+});
+
+it('links only the id the creating page reports after arming, and only from that page', async () => {
+  const project = await addProject(path.join(approved, 'first'));
+  const id = (project.chatgpt as { requestId: string }).requestId;
+  expect(await armProjectCreate(id, 'page-a')).toBe(false); // nothing claimed yet
+  expect(await claimProjectCreate(id, 'page-a')).toBe(true);
+  expect(await claimProjectCreate(id, 'page-b')).toBe(false);
+  expect(await completeProjectCreate(id, 'page-a', nativeId)).toBe(false); // not armed
+  expect(await armProjectCreate(id, 'page-a')).toBe(true);
+  expect(await completeProjectCreate(id, 'page-b', nativeId)).toBe(false);
+  expect(await completeProjectCreate(id, 'page-a', 'g-p-not-an-id')).toBe(false);
+  expect(await completeProjectCreate(id, 'page-a', nativeId)).toBe(true);
+  expect((await getProject(project.id))?.chatgpt).toMatchObject({ state: 'linked', id: nativeId });
+  expect(await pendingProjectCreates()).toEqual([]);
+});
+
+it('fails plainly before the click, but leaves an armed creation uncertain and never retries it on its own', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  try {
+    const first = await addProject(path.join(approved, 'first'));
+    const second = await addProject(path.join(approved, 'second'));
+    const a = (first.chatgpt as { requestId: string }).requestId, b = (second.chatgpt as { requestId: string }).requestId;
+    await claimProjectCreate(a, 'page-a');
+    expect(await failProjectCreate(a, 'page-a', 'no dialog')).toBe(true);
+    expect((await getProject(first.id))?.chatgpt).toMatchObject({ state: 'failed', error: 'no dialog' });
+    await claimProjectCreate(b, 'page-b'); await armProjectCreate(b, 'page-b');
+    vi.setSystemTime(Date.now() + PROJECT_CREATE_ARMED_MS);
+    expect((await pendingProjectCreates())?.map(row => row.projectId)).toEqual([]);
+    expect((await getProject(second.id))?.chatgpt).toMatchObject({ state: 'uncertain' });
+    // Only the person asks again, with a fresh request.
+    const retried = await retryProjectCreate(second.id);
+    expect(retried?.chatgpt).toMatchObject({ state: 'requested' });
+    expect((retried?.chatgpt as { requestId: string }).requestId).not.toBe(b);
+  } finally { vi.useRealTimers(); }
+});
+
+it('offers a claim that lapsed before its click to another page', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  try {
+    const project = await addProject(path.join(approved, 'first'));
+    const id = (project.chatgpt as { requestId: string }).requestId;
+    await claimProjectCreate(id, 'page-a');
+    expect((await pendingProjectCreates())?.[0]).toMatchObject({ state: 'claimed' });
+    vi.setSystemTime(Date.now() + PROJECT_CREATE_CLAIM_MS);
+    expect((await pendingProjectCreates())?.[0]).toMatchObject({ state: 'requested' });
+    expect(await armProjectCreate(id, 'page-a')).toBe(false);
+    expect(await claimProjectCreate(id, 'page-b')).toBe(true);
+  } finally { vi.useRealTimers(); }
+});
+
+it("holds a new chat of a project until its native ChatGPT Project exists, then offers it only for that Project", async () => {
+  const project = await addProject(path.join(approved, 'first'));
+  const id = (project.chatgpt as { requestId: string }).requestId;
+  const input = await enqueueInput({ id: randomUUID(), projectId: project.id, sessionId: null, text: 'Start here', dueAt: 0, mode: 'auto', model: null, reasoningEffort: null });
+  // Never offered for the root while the Project is being created (or could not be).
+  expect((await pendingBrowserInputs()).some(row => row.id === input.id)).toBe(false);
+  await claimProjectCreate(id, 'page'); await armProjectCreate(id, 'page');
+  expect((await pendingBrowserInputs()).some(row => row.id === input.id)).toBe(false);
+  await completeProjectCreate(id, 'page', nativeId);
+  expect((await pendingBrowserInputs()).find(row => row.id === input.id)).toMatchObject({ conversationId: null, project: nativeId });
+  // A project without one is unchanged: its new chat is offered without a Project.
+  const plain = await enqueueInput({ id: randomUUID(), projectId: null, sessionId: null, text: 'Plain', dueAt: 0, mode: 'auto', model: null, reasoningEffort: null });
+  expect((await pendingBrowserInputs()).find(row => row.id === plain.id)).not.toHaveProperty('project');
+});
+
+it('turns only the exact linked Project ChatGPT no longer opens into a failure that offers Retry', async () => {
+  const project = await addProject(path.join(approved, 'first'));
+  const id = (project.chatgpt as { requestId: string }).requestId;
+  await claimProjectCreate(id, 'page'); await armProjectCreate(id, 'page'); await completeProjectCreate(id, 'page', nativeId);
+  expect(await markProjectGone(project.id, `g-p-${'b'.repeat(32)}`)).toBe(false);
+  expect(await markProjectGone(project.id, nativeId)).toBe(true);
+  expect((await getProject(project.id))?.chatgpt).toMatchObject({ state: 'failed', error: 'ChatGPT no longer opens this Project' });
+  expect((await retryProjectCreate(project.id))?.chatgpt).toMatchObject({ state: 'requested' });
+});
+
+it("turns an armed creation uncertain on the app's own clock, with no browser asking", async () => {
+  const project = await addProject(path.join(approved, 'first'));
+  const id = (project.chatgpt as { requestId: string }).requestId;
+  await claimProjectCreate(id, 'page');
+  vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+  try {
+    await armProjectCreate(id, 'page');
+    await vi.advanceTimersByTimeAsync(PROJECT_CREATE_ARMED_MS + 100);
+  } finally { vi.useRealTimers(); }
+  // The sweep's catalog write is real disk I/O.
+  for (let i = 0; i < 40 && (await getProject(project.id))?.chatgpt?.state !== 'uncertain'; i++) await new Promise(resolve => setTimeout(resolve, 25));
+  expect((await getProject(project.id))?.chatgpt).toMatchObject({ state: 'uncertain' });
+});
+
+/** A project created here whose native ChatGPT Project now exists with the given id. */
+async function linkedProject(folder: string, chatgptId = nativeId) {
+  const project = await addProject(path.join(approved, folder));
+  const request = (project.chatgpt as { requestId: string }).requestId;
+  expect(await claimProjectCreate(request, 'page')).toBe(true);
+  expect(await armProjectCreate(request, 'page')).toBe(true);
+  expect(await completeProjectCreate(request, 'page', chatgptId)).toBe(true);
+  return project;
+}
+
+it('puts a chat started inside a linked ChatGPT Project into that project (#1744)', async () => {
+  const project = await linkedProject('first');
+  await addProject(path.join(approved, 'second'));
+  const chat = await createSession({ title: 'Started on chatgpt.com', conversationId: randomUUID() });
+  expect(await bindChatToLinkedProject(chat.id, nativeId)).toBe('bound');
+  expect((await getSession(chat.id))?.projectId).toBe(project.id);
+  expect(await getSessionProject(chat.id)).toMatchObject({ virtual: '/work/first' });
+  // Seen again, or seen in another Project later: a chat never changes project this way.
+  expect(await bindChatToLinkedProject(chat.id, nativeId)).toBe('kept');
+  expect(await bindChatToLinkedProject(chat.id, `g-p-${'b'.repeat(32)}`)).toBe('kept');
+  expect((await getSession(chat.id))?.projectId).toBe(project.id);
+});
+
+it('leaves a chat alone when nothing, or more than one project, is linked to its ChatGPT Project (#1744)', async () => {
+  const first = await linkedProject('first');
+  const chat = await createSession({ title: 'Elsewhere', conversationId: randomUUID() });
+  expect(await bindChatToLinkedProject(chat.id, `g-p-${'b'.repeat(32)}`)).toBe('none');
+  expect(await bindChatToLinkedProject(chat.id, 'g-p-not-an-id')).toBe('none');
+  // A removed project keeps its link row but is no longer a destination.
+  await removeProject(first.id);
+  expect(await bindChatToLinkedProject(chat.id, nativeId)).toBe('none');
+  // Two rows naming the same ChatGPT Project (an edited or restored catalog): never guess.
+  const second = await linkedProject('second');
+  const rows = await listProjects();
+  await (await import('../src/main/durable.js')).writeDurableNow('projects', rows.map(row =>
+    row.id === first.id ? { ...row, ungrouped: false, chatgpt: { ...row.chatgpt!, id: nativeId } } : row));
+  expect(second.id).not.toBe(first.id);
+  expect(await bindChatToLinkedProject(chat.id, nativeId)).toBe('ambiguous');
+  expect((await getSession(chat.id))?.projectId).toBeUndefined();
+  expect(await bindChatToLinkedProject('no-such-session', nativeId)).toBe('none');
+});
+
+it("never moves a worker, or a chat that already works in a folder, into a linked project (#1744)", async () => {
+  await linkedProject('first');
+  const prime = await createSession({ title: 'Prime', conversationId: randomUUID() });
+  const worker = await createSession({ title: 'Worker', conversationId: randomUUID(), origin: { kind: 'worker', fromSessionId: prime.id, agentId: 'worker-1', task: 'Inspect' } });
+  expect(await bindChatToLinkedProject(worker.id, nativeId)).toBe('kept');
+  expect((await getSession(worker.id))?.projectId).toBeUndefined();
+  const working = await createSession({ title: 'Already working', conversationId: randomUUID() });
+  setWorkspaceFor(`chat:${working.conversationId}`, { virtual: '/work/second', real: path.join(approved, 'second') });
+  try {
+    expect(await bindChatToLinkedProject(working.id, nativeId)).toBe('kept');
+    expect((await getSession(working.id))?.projectId).toBeUndefined();
+  } finally { resetWorkspaces(); }
+});
+
+it('keeps a sub-agent created during a move in the project the chat moves to', async () => {
+  const first = await addProject(path.join(approved, 'first'));
+  const second = await addProject(path.join(approved, 'second'));
+  const chat = await createSession({ title: 'Main', conversationId: randomUUID() });
+  await assignSessionProject(chat.id, first.id);
+  const worker = await createSession({ title: 'Worker', conversationId: randomUUID() });
+  // The worker's origin is written while the family moves: it must end where its main chat is.
+  await Promise.all([
+    setSessionOrigin(worker.id, { kind: 'worker', fromSessionId: chat.id, agentId: 'worker-1', task: 'Check' }, 'Worker'),
+    moveChatToProject(chat.id, second.id)
+  ]);
+  expect((await getSession(chat.id))?.projectId).toBe(second.id);
+  expect((await getSession(worker.id))?.projectId).toBe(second.id);
+});
+
+it('runs two overlapping moves of one chat with their groups one after the other', async () => {
+  const groups = await import('../src/main/chat-groups.js');
+  groups.resetChatGroupsForTests();
+  const first = await addProject(path.join(approved, 'first'));
+  const second = await addProject(path.join(approved, 'second'));
+  const chat = await createSession({ title: 'Main', conversationId: randomUUID() });
+  await assignSessionProject(chat.id, first.id);
+  const { group } = await groups.createChatGroup(first.id, 'Spanish', () => true);
+  await groups.assignChatGroup({ id: chat.id, projectId: first.id, origin: null }, group.id);
+  const [away, back] = await Promise.all([moveChatWithGroup(chat.id, second.id), moveChatWithGroup(chat.id, first.id)]);
+  // The second move starts from where the first left the chat: project second, no group. Its Undo
+  // goes there, not to the group the chat had before the first move.
+  expect(away).toMatchObject({ from: first.id, fromGroup: group.id });
+  expect(back).toMatchObject({ from: second.id, fromGroup: null });
+  expect((await getSession(chat.id))?.projectId).toBe(first.id);
+  expect((await groups.chatGroupsState()).members[chat.id]).toBeUndefined();
+});
+
+it('finishes a family move that stopped half way when the person moves the chat there again', async () => {
+  // A write that failed, or a restart, between the family's writes left a sub-agent behind. Moving
+  // the chat to the project it already shows must still bring the rest of the family along.
+  const first = await addProject(path.join(approved, 'first'));
+  const second = await addProject(path.join(approved, 'second'));
+  const chat = await createSession({ title: 'Main', conversationId: randomUUID() });
+  await assignSessionProject(chat.id, first.id);
+  const worker = await createSession({ title: 'Worker', conversationId: randomUUID() });
+  await setSessionOrigin(worker.id, { kind: 'worker', fromSessionId: chat.id, agentId: 'worker-1', task: 'Check' }, 'Worker');
+  await moveSessionProject(chat.id, second.id);
+  expect((await getSession(worker.id))?.projectId).toBe(first.id);
+
+  expect(await moveChatToProject(chat.id, second.id)).toEqual({ from: second.id, moved: [worker.id] });
+  expect((await getSession(worker.id))?.projectId).toBe(second.id);
+  // Nothing left to repair: a no-op again.
+  expect(await moveChatToProject(chat.id, second.id)).toEqual({ from: second.id, moved: [] });
+});
+
+it('moves a chat with its sub-agents to another project and out again, and keeps it where the person put it (#1919)', async () => {
+  const first = await linkedProject('first');
+  const second = await addProject(path.join(approved, 'second'));
+  const chat = await createSession({ title: 'Main', conversationId: randomUUID() });
+  await assignSessionProject(chat.id, first.id);
+  const worker = await createSession({ title: 'Worker', conversationId: randomUUID() });
+  await setSessionOrigin(worker.id, { kind: 'worker', fromSessionId: chat.id, agentId: 'worker-1', task: 'Check' }, 'Worker');
+  const nested = await createSession({ title: 'Nested', conversationId: randomUUID() });
+  await setSessionOrigin(nested.id, { kind: 'worker', fromSessionId: worker.id, agentId: 'worker-2', task: 'Check' }, 'Nested');
+  // A branch of the chat is a chat of its own: it stays.
+  const branch = await createSession({ title: 'Branch', conversationId: randomUUID() });
+  await setSessionOrigin(branch.id, { kind: 'desktop', fromSessionId: chat.id, agentId: null, task: '' }, 'Branch');
+
+  expect(await moveChatToProject(chat.id, second.id)).toEqual({ from: first.id, moved: [chat.id, worker.id, nested.id] });
+  for (const id of [chat.id, worker.id, nested.id]) expect(await getSession(id)).toMatchObject({ projectId: second.id, projectChosen: true });
+  expect((await getSession(branch.id))?.projectId).toBe(first.id);
+  // Its commands now run in the new project's folder.
+  expect(await getSessionProject(chat.id)).toMatchObject({ virtual: '/work/second' });
+  await expect(moveChatToProject(worker.id, first.id)).rejects.toThrow('A sub-agent chat follows its main chat');
+
+  expect(await moveChatToProject(chat.id, null)).toMatchObject({ from: second.id });
+  expect((await getSession(chat.id))?.projectId).toBeUndefined();
+  expect(await getSessionProject(chat.id)).toBeNull();
+  // Started in the linked ChatGPT Project, but the person took it out: the app does not put it back.
+  expect(await bindChatToLinkedProject(chat.id, nativeId)).toBe('kept');
+  expect((await getSession(chat.id))?.projectId).toBeUndefined();
+  expect(await moveChatToProject(chat.id, null)).toEqual({ from: null, moved: [] });
+});
+
+it('refuses a move to a project that is gone or taken off the sidebar (#1919)', async () => {
+  const project = await addProject(path.join(approved, 'first'));
+  const chat = await createSession({ title: 'Main', conversationId: randomUUID() });
+  await expect(moveChatToProject(chat.id, randomUUID())).rejects.toThrow('Project not found');
+  await removeProject(project.id);
+  await expect(moveChatToProject(chat.id, project.id)).rejects.toThrow('Project not found');
+  await expect(moveChatToProject('no-such-session', null)).rejects.toThrow('This chat no longer exists');
+  expect((await getSession(chat.id))?.projectChosen).toBeUndefined();
+});
+
+it('moves a chat into a project whose folder is missing (#1919)', async () => {
+  const project = await addProject(path.join(approved, 'first'));
+  await fs.rm(path.join(approved, 'first'), { recursive: true });
+  const chat = await createSession({ title: 'Main', conversationId: randomUUID() });
+  expect(await moveChatToProject(chat.id, project.id)).toMatchObject({ from: null });
+  expect((await getSession(chat.id))?.projectId).toBe(project.id);
+});
+
+it('runs overlapping moves of one chat in order, each reporting the project it replaced (#1965)', async () => {
+  const first = await addProject(path.join(approved, 'first'));
+  const second = await addProject(path.join(approved, 'second'));
+  const chat = await createSession({ title: 'Main', conversationId: randomUUID() });
+  const [toFirst, toSecond] = await Promise.all([moveChatToProject(chat.id, first.id), moveChatToProject(chat.id, second.id)]);
+  expect(toFirst.from).toBeNull();
+  // Undo of the second goes back to the first, where the chat really was.
+  expect(toSecond.from).toBe(first.id);
+  expect((await getSession(chat.id))?.projectId).toBe(second.id);
+});
+
+it('names the new folder once in the person\'s next message after a move into a project (#1919)', async () => {
+  const { prepareSkillFollowup } = await import('../src/main/session/prompt.js');
+  const { clearProjectNote } = await import('../src/main/session/store.js');
+  const { userPromptText } = await import('../src/shared/user-prompt.js');
+  const project = await addProject(path.join(approved, 'second'));
+  const chat = await createSession({ title: 'Main', conversationId: randomUUID() });
+  await moveChatToProject(chat.id, project.id);
+  expect((await getSession(chat.id))?.projectNotePending).toBe(true);
+  const noted = await prepareSkillFollowup('Next step', 'Next step', undefined, { sessionId: chat.id }, true);
+  expect(noted).toContain('Selected project directory: /work/second');
+  // The person's words stay exactly theirs after the app's frame.
+  expect(userPromptText(noted)).toBe('Next step');
+  expect(await prepareSkillFollowup('Next step', 'Next step', undefined, { sessionId: chat.id }, false)).toBe('Next step');
+  await clearProjectNote(chat.id);
+  expect((await getSession(chat.id))?.projectNotePending).toBeUndefined();
+  // Moved in again, then out while that note is pending: out has no folder to name.
+  const other = await addProject(path.join(approved, 'first'));
+  await moveChatToProject(chat.id, other.id);
+  expect((await getSession(chat.id))?.projectNotePending).toBe(true);
+  await moveChatToProject(chat.id, null);
+  expect((await getSession(chat.id))?.projectNotePending).toBeUndefined();
+});
+
+it('never gives a sub-agent chat the folder note: an isolated worker keeps its own workspace', async () => {
+  const project = await addProject(path.join(approved, 'second'));
+  const chat = await createSession({ title: 'Main', conversationId: randomUUID() });
+  const worker = await createSession({ title: 'Worker', conversationId: randomUUID() });
+  await setSessionOrigin(worker.id, { kind: 'worker', fromSessionId: chat.id, agentId: 'worker-1', task: 'Check' }, 'Worker');
+  await moveChatToProject(chat.id, project.id);
+  expect((await getSession(worker.id))?.projectId).toBe(project.id);
+  expect((await getSession(worker.id))?.projectNotePending).toBeUndefined();
+  expect((await getSession(chat.id))?.projectNotePending).toBe(true);
+});
+
+it.each(['deleted', 'other project'])('refuses a %s target group before moving a chat or its workers', async kind => {
+  const groups = await import('../src/main/chat-groups.js');
+  groups.resetChatGroupsForTests();
+  const first = await addProject(path.join(approved, 'first'));
+  const second = await addProject(path.join(approved, 'second'));
+  const chat = await createSession({ title: 'Main', conversationId: randomUUID() });
+  await assignSessionProject(chat.id, first.id);
+  const worker = await createSession({ title: 'Worker', conversationId: randomUUID() });
+  await setSessionOrigin(worker.id, { kind: 'worker', fromSessionId: chat.id, agentId: 'worker-1', task: 'Check' }, 'Worker');
+  const { group: original } = await groups.createChatGroup(first.id, 'Original', () => true);
+  await groups.assignChatGroup({ id: chat.id, projectId: first.id }, original.id);
+  const { group: target } = await groups.createChatGroup(kind === 'deleted' ? second.id : first.id, 'Target', () => true);
+  if (kind === 'deleted') await groups.deleteChatGroup(target.id);
+
+  await expect(moveChatWithGroup(chat.id, second.id, target.id)).rejects.toThrow("This chat is not in that group's project");
+  await flushDurable();
+  resetSessionStoreForTests(); initSessionStore(directory);
+  expect((await getSession(chat.id))?.projectId).toBe(first.id);
+  expect((await getSession(worker.id))?.projectId).toBe(first.id);
+  expect((await groups.chatGroupsState()).members[chat.id]).toBe(original.id);
+  // A rejected move releases both queues, so the next valid move still works.
+  await expect(moveChatWithGroup(chat.id, second.id)).resolves.toMatchObject({ from: first.id, fromGroup: original.id });
+});
+
+it('orders deletion of a target group after an in-flight project move', async () => {
+  const groups = await import('../src/main/chat-groups.js');
+  const store = await import('../src/main/session/store.js');
+  groups.resetChatGroupsForTests();
+  const first = await addProject(path.join(approved, 'first'));
+  const second = await addProject(path.join(approved, 'second'));
+  const chat = await createSession({ title: 'Main', conversationId: randomUUID() });
+  await assignSessionProject(chat.id, first.id);
+  const { group } = await groups.createChatGroup(second.id, 'Target', () => true);
+  let entered!: () => void, release!: () => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const original = store.moveSessionProject;
+  const paused = vi.spyOn(store, 'moveSessionProject').mockImplementation(async (...args) => {
+    entered(); await gate; return original(...args);
+  });
+  const moving = moveChatWithGroup(chat.id, second.id, group.id);
+  const outcome = moving.then(result => ({ result, error: null }), error => ({ result: null, error }));
+  let deleting: Promise<unknown> | undefined;
+  try {
+    await started;
+    deleting = groups.deleteChatGroup(group.id);
+    expect((await groups.chatGroupsState()).groups).toContainEqual(group);
+    release();
+    const moved = await outcome;
+    expect(moved.error).toBeNull();
+    expect(moved.result?.groups.members[chat.id]).toBe(group.id);
+    await deleting;
+    expect((await groups.chatGroupsState()).members[chat.id]).toBeUndefined();
+    expect((await getSession(chat.id))?.projectId).toBe(second.id);
+  } finally {
+    release(); await outcome; await deleting; paused.mockRestore();
+  }
+});
+
+it.each(['group', 'ungrouped project', 'none'] as const)('recovers a committed project move to %s after losing the pending group save on restart', async destination => {
+  const groups = await import('../src/main/chat-groups.js');
+  groups.resetChatGroupsForTests();
+  const first = await addProject(path.join(approved, 'first'));
+  const second = await addProject(path.join(approved, 'second'));
+  const chat = await createSession({ title: 'Crash recovery', conversationId: randomUUID() });
+  await assignSessionProject(chat.id, first.id);
+  const { group: original } = await groups.createChatGroup(first.id, 'Original', () => true);
+  const { group: target } = await groups.createChatGroup(second.id, 'Target', () => true);
+  await groups.assignChatGroup({ id: chat.id, projectId: first.id }, original.id);
+  await flushDurable();
+
+  await moveChatWithGroup(chat.id, destination === 'none' ? null : second.id, destination === 'group' ? target.id : null);
+  // Kill the volatile debounced write before a timer can run. Only the actual disk image survives.
+  resetDurableForTests(); resetSessionStoreForTests(); groups.resetChatGroupsForTests();
+  initDurableStore(directory); initSessionStore(directory);
+  expect((await getSession(chat.id))?.projectId ?? null).toBe(destination === 'none' ? null : second.id);
+  const recovered = await groups.chatGroupsState();
+  expect(recovered.members[chat.id]).toBe(destination === 'group' ? target.id : undefined);
+  // Recovery itself is durable and idempotent, not just a repaired in-memory projection.
+  resetDurableForTests(); resetSessionStoreForTests(); groups.resetChatGroupsForTests();
+  initDurableStore(directory); initSessionStore(directory);
+  expect(await groups.chatGroupsState()).toEqual(recovered);
+});
+
+it('keeps the original group on restart when a project write never committed', async () => {
+  const groups = await import('../src/main/chat-groups.js');
+  groups.resetChatGroupsForTests();
+  const first = await addProject(path.join(approved, 'first'));
+  const second = await addProject(path.join(approved, 'second'));
+  const chat = await createSession({ title: 'Uncommitted move' });
+  await assignSessionProject(chat.id, first.id);
+  const { group: original } = await groups.createChatGroup(first.id, 'Original', () => true);
+  const { group: target } = await groups.createChatGroup(second.id, 'Target', () => true);
+  await groups.assignChatGroup({ id: chat.id, projectId: first.id }, original.id);
+  await flushDurable();
+  await expect(groups.moveChatGroup({ id: chat.id, projectId: first.id }, second.id, target.id, async () => {
+    throw new Error('project write failed');
+  })).rejects.toThrow('project write failed');
+  resetDurableForTests(); resetSessionStoreForTests(); groups.resetChatGroupsForTests();
+  initDurableStore(directory); initSessionStore(directory);
+  expect((await getSession(chat.id))?.projectId).toBe(first.id);
+  expect((await groups.chatGroupsState()).members[chat.id]).toBe(original.id);
+});
+
+
+it('recovers a group created just before the move without a previous catalog flush', async () => {
+  const groups = await import('../src/main/chat-groups.js');
+  groups.resetChatGroupsForTests();
+  const first = await addProject(path.join(approved, 'first'));
+  const second = await addProject(path.join(approved, 'second'));
+  const chat = await createSession({ title: 'New group before crash' });
+  await assignSessionProject(chat.id, first.id);
+  const { group } = await groups.createChatGroup(second.id, 'New target', () => true);
+  await moveChatWithGroup(chat.id, second.id, group.id);
+  resetDurableForTests(); resetSessionStoreForTests(); groups.resetChatGroupsForTests();
+  initDurableStore(directory); initSessionStore(directory);
+  const recovered = await groups.chatGroupsState();
+  expect(recovered.groups).toContainEqual(group);
+  expect(recovered.members[chat.id]).toBe(group.id);
+});
+
+it('does not move the project when its group recovery intent cannot be persisted', async () => {
+  const groups = await import('../src/main/chat-groups.js');
+  groups.resetChatGroupsForTests();
+  const first = await addProject(path.join(approved, 'first'));
+  const second = await addProject(path.join(approved, 'second'));
+  const chat = await createSession({ title: 'Failed prepare' });
+  await assignSessionProject(chat.id, first.id);
+  const { group } = await groups.createChatGroup(second.id, 'Target', () => true);
+  await flushDurable();
+  const file = path.join(directory, 'state', 'chat-groups.json');
+  const original = fs.rename;
+  const write = vi.spyOn(fs, 'rename').mockImplementation(async (from, to) => {
+    if (String(to) === file) throw Object.assign(new Error('group write failed'), { code: 'EIO' });
+    return original(from, to);
+  });
+  try {
+    await expect(moveChatWithGroup(chat.id, second.id, group.id)).rejects.toThrow('group write failed');
+    expect((await getSession(chat.id))?.projectId).toBe(first.id);
+  } finally { write.mockRestore(); }
+  // The failed intent's retained retry cannot later create an unadmitted placement.
+  await flushDurable();
+  expect(JSON.parse(await fs.readFile(file, 'utf8'))).not.toHaveProperty('move');
+});
+
+it.each(['metadata', 'group read', 'recovery write'] as const)('retains a crash recovery intent when %s is unavailable and retries safely', async unavailable => {
+  const groups = await import('../src/main/chat-groups.js');
+  const store = await import('../src/main/session/store.js');
+  groups.resetChatGroupsForTests();
+  const first = await addProject(path.join(approved, 'first'));
+  const second = await addProject(path.join(approved, 'second'));
+  const chat = await createSession({ title: 'Retry recovery' });
+  await assignSessionProject(chat.id, first.id);
+  const { group } = await groups.createChatGroup(second.id, 'Target', () => true);
+  await flushDurable();
+  await moveChatWithGroup(chat.id, second.id, group.id);
+  resetDurableForTests(); resetSessionStoreForTests(); groups.resetChatGroupsForTests();
+  initDurableStore(directory); initSessionStore(directory);
+  const file = path.join(directory, 'state', 'chat-groups.json');
+  const saved = await fs.readFile(file, 'utf8');
+  const read = fs.readFile, rename = fs.rename;
+  const fail = Object.assign(new Error('storage unavailable'), { code: 'EIO' });
+  const fault = unavailable === 'metadata' ? vi.spyOn(store, 'getSessionOrNullIfMissing').mockRejectedValue(fail)
+    : unavailable === 'group read' ? vi.spyOn(fs, 'readFile').mockImplementation((...args: Parameters<typeof fs.readFile>) => {
+      if (String(args[0]) === file) return Promise.reject(fail);
+      return read(...args);
+    }) : vi.spyOn(fs, 'rename').mockImplementation(async (from, to) => {
+      if (String(to) === file) throw fail;
+      return rename(from, to);
+    });
+  try {
+    await expect(groups.chatGroupsState()).rejects.toThrow();
+    await expect(groups.createChatGroup(second.id, 'Must wait', () => true)).rejects.toThrow();
+    expect(await read(file, 'utf8')).toBe(saved);
+  } finally { fault.mockRestore(); }
+  const recovered = await groups.chatGroupsState();
+  expect(recovered.members[chat.id]).toBe(group.id);
+  expect(recovered.groups.some(row => row.name === 'Must wait')).toBe(false);
+  expect(JSON.parse(await fs.readFile(file, 'utf8'))).not.toHaveProperty('move');
+  // A later explicit choice wins over the recovered intent, including after another restart.
+  await groups.assignChatGroup(await getSession(chat.id), null);
+  await flushDurable();
+  resetDurableForTests(); resetSessionStoreForTests(); groups.resetChatGroupsForTests();
+  initDurableStore(directory); initSessionStore(directory);
+  expect((await groups.chatGroupsState()).members[chat.id]).toBeUndefined();
+});
+
+
+it('retires a saved group move for a chat deleted before recovery without recreating it', async () => {
+  const groups = await import('../src/main/chat-groups.js');
+  groups.resetChatGroupsForTests();
+  const first = await addProject(path.join(approved, 'first'));
+  const second = await addProject(path.join(approved, 'second'));
+  const chat = await createSession({ title: 'Removed before recovery' });
+  await assignSessionProject(chat.id, first.id);
+  const { group } = await groups.createChatGroup(second.id, 'Target', () => true);
+  await flushDurable();
+  await moveChatWithGroup(chat.id, second.id, group.id);
+  resetDurableForTests(); resetSessionStoreForTests(); groups.resetChatGroupsForTests();
+  const sessionDir = path.join(directory, 'sessions', chat.id);
+  await fs.rm(sessionDir, { recursive: true });
+  initDurableStore(directory); initSessionStore(directory);
+  expect((await groups.chatGroupsState()).members[chat.id]).toBeUndefined();
+  await expect(fs.stat(sessionDir)).rejects.toMatchObject({ code: 'ENOENT' });
+  expect(JSON.parse(await fs.readFile(path.join(directory, 'state', 'chat-groups.json'), 'utf8'))).not.toHaveProperty('move');
+});
+
+it.each(['legacy', 'broken JSON', 'null'] as const)('loads %s group data without requiring a move receipt', async kind => {
+  const groups = await import('../src/main/chat-groups.js');
+  groups.resetChatGroupsForTests();
+  const legacy = { version: 1, groups: [{ id: 'kept', projectId: 'legacy-project', name: 'Kept', createdAt: 1 }], members: { 'legacy-chat': 'kept' } };
+  await fs.mkdir(path.join(directory, 'state'), { recursive: true });
+  await fs.writeFile(path.join(directory, 'state', 'chat-groups.json'), kind === 'legacy' ? JSON.stringify(legacy) : kind === 'null' ? 'null' : '{broken');
+  expect(await groups.chatGroupsState()).toEqual(kind === 'legacy' ? legacy : { version: 1, groups: [], members: {} });
+});
+
+it('recovers committed group placement after a move callback reports a late failure', async () => {
+  const groups = await import('../src/main/chat-groups.js');
+  groups.resetChatGroupsForTests();
+  const first = await addProject(path.join(approved, 'first'));
+  const second = await addProject(path.join(approved, 'second'));
+  const chat = await createSession({ title: 'Late move failure' });
+  await assignSessionProject(chat.id, first.id);
+  const { group: original } = await groups.createChatGroup(first.id, 'Original', () => true);
+  const { group: target } = await groups.createChatGroup(second.id, 'Target', () => true);
+  await groups.assignChatGroup({ id: chat.id, projectId: first.id }, original.id);
+  await flushDurable();
+  await expect(groups.moveChatGroup({ id: chat.id, projectId: first.id }, second.id, target.id, async () => {
+    await moveSessionProject(chat.id, second.id);
+    throw new Error('later family write failed');
+  })).rejects.toThrow('later family write failed');
+  expect((await getSession(chat.id))?.projectId).toBe(second.id);
+  expect((await groups.chatGroupsState()).members[chat.id]).toBe(target.id);
+  resetDurableForTests(); resetSessionStoreForTests(); groups.resetChatGroupsForTests();
+  initDurableStore(directory); initSessionStore(directory);
+  expect((await groups.chatGroupsState()).members[chat.id]).toBe(target.id);
+});
+
+it('keeps a pending ungrouping across project-only round trips and a restart', async () => {
+  const groups = await import('../src/main/chat-groups.js');
+  groups.resetChatGroupsForTests();
+  const first = await addProject(path.join(approved, 'first'));
+  const second = await addProject(path.join(approved, 'second'));
+  const chat = await createSession({ title: 'Ungrouped round trip' });
+  await assignSessionProject(chat.id, first.id);
+  const { group } = await groups.createChatGroup(first.id, 'Original', () => true);
+  await groups.assignChatGroup({ id: chat.id, projectId: first.id }, group.id);
+  await flushDurable();
+  // Hold only the debounce timers; real project/session disk writes still run.
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  try {
+    await groups.assignChatGroup(await getSession(chat.id), null);
+    await moveChatWithGroup(chat.id, second.id);
+    await moveChatWithGroup(chat.id, first.id);
+    resetDurableForTests(); resetSessionStoreForTests(); groups.resetChatGroupsForTests();
+  } finally { vi.useRealTimers(); }
+  initDurableStore(directory); initSessionStore(directory);
+  expect((await getSession(chat.id))?.projectId).toBe(first.id);
+  expect((await groups.chatGroupsState()).members[chat.id]).toBeUndefined();
+});

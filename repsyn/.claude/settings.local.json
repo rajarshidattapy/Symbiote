@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(npm test *)",
+      "Bash(node bin/reposync.js --openapi --no-tunnel)",
+      "PowerShell(node --input-type=module -e \"import { resolveAuthKey } from './dist/index.js'; console.log\\('RESOLVED KEY:', resolveAuthKey\\(\\)\\);\")",
+      "PowerShell($f=\"$HOME\\\\.reposync\\\\authkey\"; if\\(Test-Path $f\\){ \"PERSISTED FILE: \" + \\(Get-Content $f -Raw\\).Trim\\(\\) } else { \"PERSISTED FILE: \\(none\\)\" }; \"ENV REPOSYNC_KEY \\(this shell\\): \" + $\\(if\\($env:REPOSYNC_KEY\\){$env:REPOSYNC_KEY}else{'\\(not set\\)'}\\); \"ENV NGROK set: \" + [bool]$env:NGROK_AUTHTOKEN)",
+      "PowerShell(setx REPOSYNC_KEY *)",
+      "Bash(npm whoami *)",
+      "Bash(npm publish *)"
+    ]
+  }
+}
