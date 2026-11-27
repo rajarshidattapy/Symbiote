@@ -15,7 +15,7 @@ async function mount(options: { cos: boolean }) {
   vi.stubGlobal('window', dom.window); vi.stubGlobal('document', dom.window.document);
   vi.stubGlobal('navigator', { platform: 'Win32' });
   const doc = dom.window.document;
-  let pets = false, zoom = 100;
+  let zoom = 100;
   const calls: string[] = [];
   const { initViewMenu } = await import('../src/renderer/view-menu.js');
   const menu = initViewMenu({
@@ -23,7 +23,6 @@ async function mount(options: { cos: boolean }) {
     shortcuts: viaKeyboard => calls.push(viaKeyboard ? 'shortcuts:keys' : 'shortcuts'),
     cosBrowser: () => options.cos,
     showCosBrowser: () => calls.push('cos-browser'),
-    pets: { toggle: () => { pets = !pets; calls.push('pets'); }, visible: () => pets },
     // As in the app: the zoom applies later (an IPC round trip), and then refreshes the menu.
     zoom: {
       step: async delta => { await Promise.resolve(); zoom += Math.round(delta * 100); menu.refresh(); },
@@ -51,15 +50,14 @@ it('opens one menu with each action, its icon and its shortcut, the CoS browser 
   // Not the sidebar: its own toggle sits right beside the menu's button.
   expect(view.items()).toEqual([
     ['search', 'Search chats', 'Ctrl+K'],
-    ['pets', 'Show pets', null],
     ['zoom-in', 'Zoom in', 'Ctrl++'],
     ['zoom-out', 'Zoom out', 'Ctrl+−'],
     ['zoom-reset', 'Actual size', 'Ctrl+0'],
     ['shortcuts', 'Keyboard shortcuts', 'Ctrl+/']
   ]);
   // Every item draws its icon, and the groups are separated.
-  expect(view.open()!.querySelectorAll('.row-menu-item > .ico').length).toBe(6);
-  expect(view.open()!.querySelectorAll('.row-menu-separator').length).toBe(3);
+  expect(view.open()!.querySelectorAll('.row-menu-item > .ico').length).toBe(5);
+  expect(view.open()!.querySelectorAll('.row-menu-separator').length).toBe(2);
   // The same button closes it.
   view.button.click();
   expect(view.open()).toBeNull();
@@ -67,7 +65,7 @@ it('opens one menu with each action, its icon and its shortcut, the CoS browser 
 
   const cos = await mount({ cos: true });
   cos.button.click();
-  expect(cos.items().map(([action]) => action)).toEqual(['search', 'cos-browser', 'pets', 'zoom-in', 'zoom-out', 'zoom-reset', 'shortcuts']);
+  expect(cos.items().map(([action]) => action)).toEqual(['search', 'cos-browser', 'zoom-in', 'zoom-out', 'zoom-reset', 'shortcuts']);
   expect(cos.item('cos-browser').querySelector('.row-menu-label')!.textContent).toBe('Show browser');
   cos.item('cos-browser').click();
   expect(cos.calls).toEqual(['cos-browser']);
@@ -84,19 +82,16 @@ it('tells the shortcuts item whether the keys or a pointer chose it', async () =
   expect(view.calls).toEqual(['shortcuts', 'shortcuts:keys']);
 });
 
-it('says what the pets toggle will do, runs actions and closes; zoom steps keep it open with the value updating', async () => {
+it('runs actions and closes; zoom steps keep the menu open with the value updating', async () => {
   const view = await mount({ cos: false });
   view.button.click();
   view.item('search').click();
   expect(view.open()).toBeNull();
   view.button.click();
-  view.item('pets').click();
-  view.button.click();
   view.item('shortcuts').click();
   expect(view.open()).toBeNull();
-  expect(view.calls).toEqual(['search', 'pets', 'shortcuts:keys']);
+  expect(view.calls).toEqual(['search', 'shortcuts:keys']);
   view.button.click();
-  expect(view.item('pets').querySelector('.row-menu-label')!.textContent).toBe('Hide pets');
 
   expect(view.item('zoom-reset').querySelector('.row-menu-hint')!.textContent).toBe('100%');
   view.item('zoom-in').click(); await view.settle();
@@ -117,7 +112,7 @@ it('opens from the keyboard and gives focus back to its button on Escape', async
   expect(view.open()).not.toBeNull();
   expect((view.doc.activeElement as HTMLElement).dataset.rowAction).toBe('search');
   view.open()!.dispatchEvent(new view.doc.defaultView!.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
-  expect((view.doc.activeElement as HTMLElement).dataset.rowAction).toBe('pets');
+  expect((view.doc.activeElement as HTMLElement).dataset.rowAction).toBe('zoom-in');
   view.open()!.dispatchEvent(new view.doc.defaultView!.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   expect(view.open()).toBeNull();
   expect(view.doc.activeElement).toBe(view.button);

@@ -128,7 +128,6 @@ const RELEASES: Readonly<Record<string, Release>> = {
       { icon: 'i-agents', title: () => t("See what a sub-agent does"), text: () => t("Opening a sub-agent shows each action with its result and the files it changed.") },
       { icon: 'i-retry', title: () => t("Long work keeps going"), text: () => t("Compact & Resume steps in during long answers, and Goal and Loop continue in a fresh turn.") },
       { icon: 'i-gear', title: () => t("Clearer Settings"), text: () => t("Plain words throughout, and the sidebar layout picked from a picture.") },
-      { icon: 'i-paw', title: () => t("Meet Whip"), text: () => t("A cheeky new pet that cracks its whip so the work goes faster.") }
     ]
   },
   '2.1.42': {

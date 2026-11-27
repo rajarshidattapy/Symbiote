@@ -15,7 +15,6 @@ import type { InputArgs, InputEntry } from '../main/session/input.js';
 import type { ChatgptProjectChoice, LocalProject, ProjectColor, RelatedFolderView } from '../shared/projects.js';
 import type { ProjectDirectoryListing, ProjectFileMutationResult, ProjectFilePreview, ProjectFileSaveResult, ProjectFilesChanged } from '../shared/project-files.js';
 import type { CheckpointRestoreResult, ProjectGitChanged, ProjectGitDiff, ProjectGitSnapshot, TurnCheckpointRestoreResult } from '../shared/project-git.js';
-import type { PetLibraryState, PetOverlayControlState, PetRuntimeAsset } from '../shared/pets.js';
 import type { SkillSummary, ManagedSkill, GitHubSkillUpdateCheck, SkillLibrary, SkillsDraftScope } from '../shared/skills.js';
 import type { RunningToolActivity, SessionChange, SessionSearchReply, SessionSearchLocation, SessionBookmark, ChatEdits, ToolEditReview } from '../shared/session.js';
 import type { TurnTrace } from '../shared/turn-trace.js';
@@ -174,9 +173,6 @@ const api = {
   assignChatGroup: (sessionId: string, groupId: string | null) => call<ChatGroupsState>('chatGroups:assign', { sessionId, groupId }),
   moveChatProject: (sessionId: string, projectId: string | null, groupId?: string | null) =>
     call<{ from: string | null; fromGroup: string | null; groups: ChatGroupsState; summaries: SessionSummary[] }>('sessions:moveProject', { sessionId, projectId, ...(groupId !== undefined ? { groupId } : {}) }),
-  petsList: () => call<PetLibraryState>('pets:list'),
-  petsOverlayState: () => call<PetOverlayControlState>('pets:overlayState'),
-  petsSetOverlayVisible: (visible: boolean) => call<PetOverlayControlState>('pets:overlayVisible', { visible }),
   /** The selected language's texts for the stopped-chat desktop notices (#855). */
   setStopNoticeTexts: (texts: Record<string, string>) => call<void>('ui:stopNoticeTexts', texts),
   setMainTexts: (texts: Record<string, string>) => call<void>('ui:mainTexts', texts),
@@ -209,16 +205,6 @@ const api = {
   },
   /** The one-time automatic plugin refresh offer: true turns it on; either answer is kept. */
   answerPluginRefreshOffer: (turnOn: boolean) => call<AppState>('pluginRefresh:offer', { turnOn }),
-  petsImport: () => call<PetLibraryState | null>('pets:import'),
-  petsSetEnabled: (id: string, enabled: boolean) => call<PetLibraryState>('pets:enabled', { id, enabled }),
-  petsSetFavorite: (id: string, favorite: boolean) => call<PetLibraryState>('pets:favorite', { id, favorite }),
-  petsDelete: (id: string) => call<PetLibraryState>('pets:delete', { id }),
-  petsAsset: (id: string, preview = false) => call<PetRuntimeAsset>('pets:asset', { id, preview }),
-  onPetOverlayStateChanged: (listener: (state: PetOverlayControlState) => void): (() => void) => {
-    const wrapped = (_event: unknown, state: PetOverlayControlState): void => listener(state);
-    ipcRenderer.on('pet-overlay:stateChanged', wrapped);
-    return () => ipcRenderer.removeListener('pet-overlay:stateChanged', wrapped);
-  },
   /** True right before a Keychain read that may wait on the macOS password prompt; false once it settled. */
   onKeychainWaiting: (listener: (waiting: boolean) => void): (() => void) => {
     const wrapped = (_event: unknown, waiting: boolean): void => listener(waiting === true);
@@ -226,11 +212,6 @@ const api = {
     return () => ipcRenderer.removeListener('keychain:waiting', wrapped);
   },
   keychainNoticeReady: () => call<void>('keychain:noticeReady'),
-  onPetOverlayOpenOwner: (listener: (screen: 'chat' | 'pets') => void): (() => void) => {
-    const wrapped = (_event: unknown, screen: 'chat' | 'pets'): void => listener(screen);
-    ipcRenderer.on('pet-overlay:openOwner', wrapped);
-    return () => ipcRenderer.removeListener('pet-overlay:openOwner', wrapped);
-  },
   listSkills: () => call<SkillSummary[]>('skills:list'),
   listManagedSkills: () => call<ManagedSkill[]>('skills:managed'),
   skillsSetEnabled: (id: string, enabled: boolean) => call<ManagedSkill[]>('skills:setEnabled', { id, enabled }),

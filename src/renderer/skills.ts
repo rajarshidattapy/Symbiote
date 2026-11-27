@@ -108,7 +108,6 @@ export const APP_COMMANDS = [
   { command: 'init', name: 'Init', description: 'Ask for an AGENTS.md that describes this project.', glyph: 'i-file-text' },
   { command: 'usage', name: 'Usage', description: 'Open usage and token statistics.', glyph: 'i-chart' },
   { command: 'plugins', name: 'Plugins', description: 'Open the plugins and their status.', glyph: 'i-plug' },
-  { command: 'pet', name: 'Pet', description: 'Open the pets.', glyph: 'i-paw' },
   { command: 'feedback', name: 'Feedback', description: 'Report a problem.', glyph: 'i-warning' },
   // The open chat's answer copy, Markdown export, web page to share and Find in chat.
   { command: 'copy', name: 'Copy', description: 'Copy the newest answer in this chat.', glyph: 'i-copy' },

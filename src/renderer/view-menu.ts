@@ -16,7 +16,6 @@ export interface ViewMenuActions {
   /** Whether the built-in CoS browser is the selected ChatGPT browser. */
   cosBrowser(): boolean;
   showCosBrowser(): void;
-  pets: { toggle(): void; visible(): boolean };
   zoom: { step(delta: number): Promise<void>; reset(): Promise<void>; percent(): number };
 }
 
@@ -34,11 +33,6 @@ export function initViewMenu(actions: ViewMenuActions): { refresh(): void } {
       action: 'cos-browser', icon: 'i-browser', separated: true,
       label: () => t('Show browser'), run: actions.showCosBrowser
     }] : []),
-    {
-      action: 'pets', icon: 'i-paw', separated: !actions.cosBrowser(),
-      label: () => actions.pets.visible() ? t('Hide pets') : t('Show pets'),
-      run: actions.pets.toggle
-    },
     {
       action: 'zoom-in', icon: 'i-zoom-in', separated: true, keepOpen: true,
       shortcut: () => primaryShortcut('+'), label: () => t('Zoom in'), run: () => void actions.zoom.step(.1)

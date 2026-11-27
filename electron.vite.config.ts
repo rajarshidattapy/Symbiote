@@ -24,7 +24,6 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'src/preload/index.ts'),
-          'pet-overlay': resolve(__dirname, 'src/preload/pet-overlay.ts'),
           'desktop-ask': resolve(__dirname, 'src/preload/desktop-ask.ts'),
           'cos-browser': resolve(__dirname, 'src/preload/cos-browser.ts'),
           'cos-browser-worker': resolve(__dirname, 'src/preload/cos-browser-worker.ts'),
@@ -52,7 +51,6 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'src/renderer/index.html'),
-          'pet-overlay': resolve(__dirname, 'src/renderer/pet-overlay.html'),
           'update-progress': resolve(__dirname, 'src/renderer/update-progress.html'),
           'desktop-ask': resolve(__dirname, 'src/renderer/desktop-ask.html'),
           'cos-browser': resolve(__dirname, 'src/renderer/cos-browser.html'),

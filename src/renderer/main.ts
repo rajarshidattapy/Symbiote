@@ -31,8 +31,6 @@ import { initSetupGuide } from './setup-guide.js';
 import { initAppearance } from './appearance.js';
 import { initKeychainNotice } from './keychain-notice.js';
 import { initDesktopAskNotice } from './desktop-ask-notice.js';
-import { initPet } from './pet.js';
-import { initPets } from './pets.js';
 import { initSkillsLibrary } from './skills-library.js';
 import { initScheduled } from './scheduled.js';
 import { initWhatsNew } from './whats-new.js';
@@ -138,7 +136,6 @@ publishMainTexts(texts => api.setMainTexts?.(texts));
 const publishUiLanguage = (): void => { void Promise.resolve(api.setUiLanguage?.(currentLanguage())).catch(() => undefined); };
 publishUiLanguage();
 onLanguageChange(publishUiLanguage);
-const pet = initPet(api, () => showTab('pets'));
 initSettingsBackup(api, {
   imported: next => {
     apply(next);
@@ -245,8 +242,6 @@ let setupKeySave: Promise<boolean> = Promise.resolve(true);
 
 // ------------------------------------------------------------------- tabs
 
-let openSkillsLibrary: () => void = () => undefined;
-
 /**
  * Beside each Setup button that opens a ChatGPT or OpenAI page in the built-in browser, the same
  * page in the system's own browser, for anyone signed in there instead. Shown only while the
@@ -278,9 +273,9 @@ let stopTour: () => void = () => undefined;
 function showTab(requested: string): void {
   const { tab: name, agentPage } = resolveSettingsTab(requested);
   if (name !== 'chat') stopTour();
-  if (name === 'skills') openSkillsLibrary();
+  if (name === 'skills') { showTab('plugins'); return; }
   placePermissions(name);
-  const library = name === 'plugins' || name === 'skills' || name === 'pets' || name === 'scheduled';
+  const library = name === 'plugins' || name === 'scheduled';
   const settings = name !== 'chat' && !library;
   // Opening Settings asks whether "Up to date" is still true (the check itself waits ten minutes).
   if (settings && document.querySelector<HTMLElement>('.app')!.dataset.screen !== 'settings') void api.refreshUpdate();
@@ -395,10 +390,7 @@ $('sessionList').addEventListener('click', event => {
 }, { capture: true });
 $('newChat').addEventListener('click', () => showTab('chat'));
 $('sidebarPlugins').addEventListener('click', () => showTab('plugins'));
-$('sidebarPets').addEventListener('click', () => showTab('pets'));
-$('sidebarSkills').addEventListener('click', () => showTab('skills'));
 $('sidebarScheduled').addEventListener('click', () => showTab('scheduled'));
-api.onPetOverlayOpenOwner(screen => showTab(screen));
 $('addProject').addEventListener('click', () => showTab('chat'));
 let zoomFactor = 1;
 let zoomEdited = false;
@@ -3206,13 +3198,11 @@ const viewMenu = initViewMenu({
   shortcuts: shortcutsDialog.open,
   cosBrowser: () => state?.config.ui.chatBrowser === 'cos',
   showCosBrowser: () => void run(api.showCosBrowser()),
-  pets: { toggle: () => pet.toggle(), visible: () => pet.isVisible() },
   zoom: { step: delta => zoom(zoomFactor + delta), reset: () => zoom(1), percent: () => zoomFactor * 100 }
 });
 initUsage();
 initPlugins(apply);
-initPets(api, pet);
-openSkillsLibrary = initSkillsLibrary(api);
+initSkillsLibrary(api);
 initBrowserPreferences();
 initChat({ save: () => save(), state: () => state, palette: {
   showChat: () => showTab('chat'),

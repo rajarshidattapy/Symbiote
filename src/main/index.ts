@@ -55,8 +55,6 @@ import { clickFinishedChatNotification, finishedNoticeRetention } from './finish
 import { DEFAULT_RECORDING_STORAGE_GIB } from '../shared/session.js';
 import { initSkillsPath } from './skills.js';
 import { initUvRuntime } from './plugins/uv-runtime.js';
-import { initPetLibrary } from './pet-library.js';
-import { refreshPetOverlayAppearance, shutdownPetOverlay, startPetOverlay } from './pet-overlay.js';
 import { shownTheme, watchSystemTheme } from './theme.js';
 import { usageOverview } from './session/usage.js';
 import {
@@ -284,7 +282,6 @@ function createWindow(): void {
   // corpse. Dropping it is what makes those paths take their existing null branch.
   window.on('closed', () => {
     window = null;
-    if (!quitting && process.platform !== 'darwin' && !getConfig().ui.minimizeToTray) void shutdownPetOverlay();
   });
 
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -501,9 +498,6 @@ void app.whenReady().then(async () => {
   if (windowActivation.isDisabled()) return;
   initControlApiPath(userData);
   initUvRuntime(userData);
-  // Bundled pet packages: the packaged app's resources, or the repository's pets/ folder in dev.
-  try { await initPetLibrary(userData, app.isPackaged ? path.join(process.resourcesPath, 'pets') : path.join(app.getAppPath(), 'pets')); }
-  catch (error) { logWarn(`Pet library unavailable: ${error instanceof Error ? error.message : String(error)}`); }
   await restoreChatModels();
   if (windowActivation.isDisabled()) return;
   await loadConfig();
@@ -693,7 +687,7 @@ void app.whenReady().then(async () => {
   // frame, application menus and OS dialogs; on Linux/Windows it covers Electron-native UI.
   nativeTheme.themeSource = getConfig().ui.theme;
   // System (#1914): the window follows the operating system when it switches.
-  watchSystemTheme(() => getConfig().ui, () => window, refreshPetOverlayAppearance);
+  watchSystemTheme(() => getConfig().ui, () => window);
   const savedGoalObjectives = await readDurable<GoalObjectivesSnapshot>(GOAL_OBJECTIVES_STATE);
   if (windowActivation.isDisabled()) return;
   restoreGoalObjectives(savedGoalObjectives);
@@ -846,13 +840,9 @@ void app.whenReady().then(async () => {
       app.quit();
     }
   );
-  // Chats are restored here; the window, once enabled, can ask for its state before the pet overlay is ready.
   markStartup('restored');
   windowActivation.enable();
   if (!isBackgroundLaunch(process.argv)) windowActivation.request();
-  // The desktop pet overlay is independent of the main window once started; it stays hidden
-  // until a pet is enabled.
-  await startPetOverlay(() => window, () => windowActivation.request());
   // macOS `activate` can fire on first launch, so do not wire it at module load where it could
   // create a BrowserWindow before Electron is ready. Once the initial window path is established,
   // Dock activation/re-launch can safely recreate or focus it.
@@ -966,7 +956,7 @@ app.on('will-quit', (event) => {
       {
         name: 'process cleanup',
         budgetMs: 15_000,
-        run: () => [unifiedExecManager.terminateAllProcesses(), workspaceTerminalsExited(), stopComputerHelper(), shutdownPetOverlay(), pluginManager.close(),
+        run: () => [unifiedExecManager.terminateAllProcesses(), workspaceTerminalsExited(), stopComputerHelper(), pluginManager.close(),
           // SFTP sessions of projects on a server (#1469): their ssh would outlive the app on Windows.
           Promise.resolve().then(() => closeRemoteSessions()),
           Promise.resolve().then(() => loadedCosBrowser()?.stop())]

@@ -1597,8 +1597,7 @@ function runSlashCommand(name: string): void {
   else if (name === 'init') prefillComposer(t('Create an AGENTS.md for this project. Read the project first, then describe how it is built, tested and run, how it is laid out, and the conventions a coding agent should follow. Keep it short and accurate.'));
   else if (name === 'usage') openSettingsTab('usage');
   else if (name === 'feedback') openFeedback();
-  else if (name === 'plugins') $('sidebarPlugins').click();
-  else if (name === 'pet') $('sidebarPets').click();
+  else if (name === 'plugins' || name === 'skills') $('sidebarPlugins').click();
   else if (name === 'copy' && chat) void run(api.exportMarkdown({ id: chat.id, scope: 'latest', target: 'clipboard' }))
     .then(result => { if (result?.done === 'copied') toast(t('Answer copied')); });
   else if (name === 'export' && chat) void run(api.exportMarkdown({ id: chat.id, scope: 'session', target: 'file' }))

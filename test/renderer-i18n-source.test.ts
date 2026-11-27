@@ -120,14 +120,14 @@ it('translates every delivery error a queued message can show', () => {
   }
 });
 
-it('translates every error the Files panel, projects, pets, skills and settings actions can show', () => {
+it('translates every error the Files panel, projects, skills and settings actions can show', () => {
   // These reach the window as the toast of a failed action, which looks each text up in the
   // catalog; none were there, so a German Files panel said "A file or folder with that name
   // already exists" in English (2.1.41 pass).
   const literal = /throw new Error\((?:'([^'\\$]{8,})'|"([^"\\$]{8,})")\)/g;
   // Also the chat actions added since: Markdown export and /copy, bookmarks, chat groups, search
   // and linking a ChatGPT Project.
-  const sources = ['src/main/project-files.ts', 'src/main/projects.ts', 'src/main/pet-library.ts', 'src/main/skills.ts',
+  const sources = ['src/main/project-files.ts', 'src/main/projects.ts', 'src/main/skills.ts',
     'src/main/skill-github.ts', 'src/main/skill-metadata.ts', 'src/main/skill-package.ts', 'src/shared/skills.ts', 'src/main/ipc.ts',
     'src/main/session/markdown-export.ts', 'src/main/session/page-export.ts', 'src/main/project-commit.ts', 'src/main/session/bookmarks.ts', 'src/main/chat-groups.ts', 'src/main/session/search.ts',
     'src/main/remote/ssh.ts',
