@@ -8,12 +8,10 @@ const nixNodeModules = process.env.npmDeps ? resolve(process.env.npmDeps, 'node_
 
 export default defineConfig({
   main: {
-    // Keep node_modules external so the MCP SDK ships as real files in the asar
-    // rather than being inlined by the bundler.
-    // The direct web-session providers must travel with the main bundle. In particular,
-    // externalizing gemini-web-api made a fresh development build fail at Electron startup when
-    // its runtime dependency tree had not yet been installed beside out/main.
-    plugins: [externalizeDepsPlugin({ exclude: ['dotenv', 'gemini-web-api'] })],
+    // Keep node_modules external so native dependencies such as Impit load through Node rather
+    // than Vite's CommonJS wrapper. The direct-provider packages are root dependencies, so both
+    // development and packaged builds resolve them from their normal dependency location.
+    plugins: [externalizeDepsPlugin()],
     build: {
       rollupOptions: { input: resolve(__dirname, 'src/main/index.ts') }
     }
