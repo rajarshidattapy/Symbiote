@@ -57,7 +57,6 @@ import { sendDesktopInput, cancelDesktopInput, retryQueuedInputBrowser, retireDe
 import { isSessionRemoving, withSessionRemoval } from './session/removal.js';
 import { wakeBrowserUrl } from './browser-startup.js';
 import { registerPluginIpc } from './plugins-ipc.js';
-import { registerHarnessIpc } from './harness-ipc.js';
 import { registerAiServiceIpc } from './ai-service-ipc.js';
 import { deletePet, importPet, loadPetAsset, petLibraryState, setPetEnabled, setPetFavorite } from './pet-library.js';
 import { assignChatGroup, chatGroupsState, createChatGroup, deleteChatGroup, forgetChatGroupMember, renameChatGroup } from './chat-groups.js';
@@ -2954,7 +2953,6 @@ export function registerIpc(getWindow: () => BrowserWindow | null, quitToInstall
   // A creation armed before the app last quit becomes uncertain on time, not on the browser's next pass.
   void expireArmedProjectCreates().catch(() => undefined);
   registerPluginIpc(handle, getWindow, pushState);
-  registerHarnessIpc(handle, getWindow);
   registerAiServiceIpc(handle);
   // Draft stages belong to session controls; state:changed only refreshes settings.
   onGoalChange(() => push('session:changed'));
