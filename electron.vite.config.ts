@@ -10,7 +10,10 @@ export default defineConfig({
   main: {
     // Keep node_modules external so the MCP SDK ships as real files in the asar
     // rather than being inlined by the bundler.
-    plugins: [externalizeDepsPlugin()],
+    // The direct web-session providers must travel with the main bundle. In particular,
+    // externalizing gemini-web-api made a fresh development build fail at Electron startup when
+    // its runtime dependency tree had not yet been installed beside out/main.
+    plugins: [externalizeDepsPlugin({ exclude: ['dotenv', 'gemini-web-api'] })],
     build: {
       rollupOptions: { input: resolve(__dirname, 'src/main/index.ts') }
     }
