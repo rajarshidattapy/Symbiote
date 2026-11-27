@@ -354,9 +354,8 @@
               </div>
             </section>
             <section class="appearance-section">
-              <header class="settings-section-head"><div><h2>Preferences</h2><p>Language and setup profiles stay independent of appearance.</p></div></header>
+              <header class="settings-section-head"><div><h2>Preferences</h2><p>Setup profiles stay independent of appearance.</p></div></header>
               <div class="settings-surface pane appearance-settings-card">
-                <label class="setting" for="uiLanguage"><span class="setting-text"><b>Language</b><em>Changes the app interface immediately. Your messages stay as written.</em></span><select id="uiLanguage" class="language-select" translate="no"><option value="de" lang="de">Deutsch</option><option value="en" lang="en">English</option><option value="es" lang="es">Español</option><option value="fr" lang="fr">Français</option><option value="pt-BR" lang="pt-BR">Português (Brasil)</option><option value="pt-PT" lang="pt-PT">Português (Portugal)</option><option value="ru" lang="ru">Русский</option><option value="tr" lang="tr">Türkçe</option><option value="vi" lang="vi">Tiếng Việt</option><option value="ja" lang="ja">日本語</option><option value="ko" lang="ko">한국어</option><option value="zh-CN" lang="zh-CN">简体中文</option><option value="zh-TW" lang="zh-TW">繁體中文</option></select></label>
                 <div class="setting setup-profile-setting">
                   <span class="setting-text"><b id="setupProfileLabel">Setup profile</b><em>Switches the saved tunnel IDs and tunnel API key, for example for another ChatGPT account.</em></span>
                   <div class="setup-profile-controls">
@@ -574,62 +573,7 @@
           <div class="sheet settings-page-content">
             <div class="setup-heading settings-page-head">
               <div><h1 id="setupTitle">Setup</h1><p>Connect your workspace to ChatGPT.</p></div>
-              <div class="language-tabs" role="group" aria-label="Language">
-                <button type="button" data-language="de" lang="de" translate="no" title="Deutsch" aria-label="Deutsch" aria-pressed="false"><svg class="language-flag" viewBox="0 0 900 600" aria-hidden="true"><image href="./flags/de.svg" width="900" height="600"/></svg></button>
-                <button type="button" data-language="en" lang="en" translate="no" title="English" aria-label="English" aria-pressed="true"><svg class="language-flag" viewBox="0 0 60 40" aria-hidden="true"><path fill="#012169" d="M0 0h60v40H0z"/><path stroke="#fff" stroke-width="8" d="m0 0 60 40M60 0 0 40"/><path stroke="#c8102e" stroke-width="3" d="m0 0 60 40M60 0 0 40"/><path stroke="#fff" stroke-width="13" d="M30 0v40M0 20h60"/><path stroke="#c8102e" stroke-width="7" d="M30 0v40M0 20h60"/></svg></button>
-                <button type="button" data-language="es" lang="es" translate="no" title="Español" aria-label="Español" aria-pressed="false"><svg class="language-flag" viewBox="0 0 60 40" aria-hidden="true"><path fill="#aa151b" d="M0 0h60v40H0z"/><path fill="#f1bf00" d="M0 10h60v20H0z"/></svg></button>
-                <button type="button" data-language="fr" lang="fr" translate="no" title="Français" aria-label="Français" aria-pressed="false"><svg class="language-flag" viewBox="0 0 60 40" aria-hidden="true"><path fill="#002395" d="M0 0h20v40H0z"/><path fill="#fff" d="M20 0h20v40H20z"/><path fill="#ed2939" d="M40 0h20v40H40z"/></svg></button>
-                <button type="button" data-language="pt-BR" lang="pt-BR" translate="no" title="Português (Brasil)" aria-label="Português (Brasil)" aria-pressed="false">
-                  <svg class="language-flag" viewBox="0 0 70 49" aria-hidden="true">
-                    <path fill="#009739" d="M0 0h70v49H0z" />
-                    <path fill="#ffdf00" d="M35 3.5 66.5 24.5 35 45.5 3.5 24.5Z" />
-                    <defs>
-                      <clipPath id="language-br-globe"><circle cx="35" cy="24.5" r="11.2" /></clipPath>
-                      <path id="language-br-star" d="M0-1.5 0.42-.48 1.5-.35.69.36.88 1.42 0 .88-.88 1.42-.69.36-1.5-.35-.42-.48Z" />
-                    </defs>
-                    <circle cx="35" cy="24.5" r="11.2" fill="#002776" />
-                    <g clip-path="url(#language-br-globe)" fill="#fff">
-                      <use href="#language-br-star" transform="translate(35 13.8) scale(.9)" />
-                      <use href="#language-br-star" transform="translate(30 15.5) scale(.75)" />
-                      <use href="#language-br-star" transform="translate(34 16) scale(.8)" />
-                      <use href="#language-br-star" transform="translate(39 16) scale(.75)" />
-                      <use href="#language-br-star" transform="translate(27 18) scale(.7)" />
-                      <use href="#language-br-star" transform="translate(31 18) scale(.8)" />
-                      <use href="#language-br-star" transform="translate(36 18) scale(.75)" />
-                      <use href="#language-br-star" transform="translate(41 18) scale(.7)" />
-                      <use href="#language-br-star" transform="translate(25 22) scale(.65)" />
-                      <use href="#language-br-star" transform="translate(29 22) scale(.8)" />
-                      <use href="#language-br-star" transform="translate(34 22) scale(.75)" />
-                      <use href="#language-br-star" transform="translate(39 23) scale(.8)" />
-                      <use href="#language-br-star" transform="translate(45 24) scale(.65)" />
-                      <use href="#language-br-star" transform="translate(27 27) scale(.7)" />
-                      <use href="#language-br-star" transform="translate(32 27) scale(.8)" />
-                      <use href="#language-br-star" transform="translate(37 27) scale(.75)" />
-                      <use href="#language-br-star" transform="translate(42 28) scale(.7)" />
-                      <use href="#language-br-star" transform="translate(44 30) scale(.6)" />
-                      <use href="#language-br-star" transform="translate(40 32) scale(.75)" />
-                      <use href="#language-br-star" transform="translate(35 31) scale(.8)" />
-                      <use href="#language-br-star" transform="translate(30 31) scale(.75)" />
-                      <use href="#language-br-star" transform="translate(26 30) scale(.6)" />
-                      <use href="#language-br-star" transform="translate(33 34) scale(.65)" />
-                      <use href="#language-br-star" transform="translate(39 34) scale(.6)" />
-                      <use href="#language-br-star" transform="translate(42 31) scale(.65)" />
-                      <use href="#language-br-star" transform="translate(28 24) scale(.65)" />
-                      <use href="#language-br-star" transform="translate(37 33) scale(.6)" />
-                    </g>
-                    <path clip-path="url(#language-br-globe)" fill="#fff" d="M22.7 17.1c6.8.8 16 2.5 24.8 5.1l-.7 3.2c-8.7-2.6-17.9-4.5-24.9-5.1z" />
-                  </svg>
-                </button>
-                <button type="button" data-language="pt-PT" lang="pt-PT" translate="no" title="Português (Portugal)" aria-label="Português (Portugal)" aria-pressed="false"><svg class="language-flag" viewBox="0 0 900 600" aria-hidden="true"><image href="./flags/pt.svg" width="900" height="600"/></svg></button>
-                <button type="button" data-language="ru" lang="ru" translate="no" title="Русский" aria-label="Русский" aria-pressed="false"><svg class="language-flag" viewBox="0 0 60 40" aria-hidden="true"><path fill="#fff" d="M0 0h60v13.333H0z"/><path fill="#0039a6" d="M0 13.333h60v13.334H0z"/><path fill="#d52b1e" d="M0 26.667h60V40H0z"/></svg></button>
-                <button type="button" data-language="tr" lang="tr" translate="no" title="Türkçe" aria-label="Türkçe" aria-pressed="false"><svg class="language-flag" viewBox="0 0 60 40" aria-hidden="true"><path fill="#e30a17" d="M0 0h60v40H0z"/><circle cx="25" cy="20" r="10" fill="#fff"/><circle cx="28" cy="20" r="8" fill="#e30a17"/><path fill="#fff" d="m39 13 1.6 4.8h5l-4 3 1.5 4.7-4.1-2.9-4.1 2.9 1.5-4.7-4-3h5z"/></svg></button>
-                <button type="button" data-language="vi" lang="vi" translate="no" title="Tiếng Việt" aria-label="Tiếng Việt" aria-pressed="false"><svg class="language-flag" viewBox="0 0 60 40" aria-hidden="true"><path fill="#da251d" d="M0 0h60v40H0z"/><path fill="#ff0" d="m30 8 2.9 8.9h9.4l-7.6 5.5 2.9 8.9-7.6-5.5-7.6 5.5 2.9-8.9-7.6-5.5h9.4z"/></svg></button>
-                <button type="button" data-language="ja" lang="ja" translate="no" title="日本語" aria-label="日本語" aria-pressed="false"><svg class="language-flag" viewBox="0 0 60 40" aria-hidden="true"><path fill="#fff" d="M0 0h60v40H0z"/><circle cx="30" cy="20" r="12" fill="#bc002d"/></svg></button>
-                <button type="button" data-language="ko" lang="ko" translate="no" title="한국어" aria-label="한국어" aria-pressed="false"><svg class="language-flag" viewBox="0 0 60 40" aria-hidden="true"><path fill="#fff" d="M0 0h60v40H0z"/><g transform="rotate(-33.69 30 20)"><path fill="#cd2e3a" d="M22 20a8 8 0 0 1 16 0 4 4 0 0 1-8 0 4 4 0 0 0-8 0Z"/><path fill="#0047a0" d="M38 20a8 8 0 0 1-16 0 4 4 0 0 1 8 0 4 4 0 0 0 8 0Z"/></g><g fill="#111"><g transform="translate(7 6) rotate(-34 5.5 5)"><rect width="11" height="1.8"/><rect y="4" width="11" height="1.8"/><rect y="8" width="11" height="1.8"/></g><g transform="translate(42 25) rotate(-34 5.5 5)"><rect width="4.3" height="1.8"/><rect x="6.7" width="4.3" height="1.8"/><rect y="4" width="4.3" height="1.8"/><rect x="6.7" y="4" width="4.3" height="1.8"/><rect y="8" width="4.3" height="1.8"/><rect x="6.7" y="8" width="4.3" height="1.8"/></g><g transform="translate(42 6) rotate(34 5.5 5)"><rect width="4.3" height="1.8"/><rect x="6.7" width="4.3" height="1.8"/><rect y="4" width="11" height="1.8"/><rect y="8" width="4.3" height="1.8"/><rect x="6.7" y="8" width="4.3" height="1.8"/></g><g transform="translate(7 25) rotate(34 5.5 5)"><rect width="11" height="1.8"/><rect y="4" width="4.3" height="1.8"/><rect x="6.7" y="4" width="4.3" height="1.8"/><rect y="8" width="11" height="1.8"/></g></g></svg></button>
-                <button type="button" data-language="zh-CN" lang="zh-CN" translate="no" title="简体中文" aria-label="简体中文" aria-pressed="false"><svg class="language-flag" viewBox="0 0 60 40" aria-hidden="true"><path fill="#de2910" d="M0 0h60v40H0z"/><g fill="#ffde00"><path d="m10 5 1.8 5.5h5.7l-4.6 3.4 1.8 5.4-4.7-3.4-4.7 3.4 1.8-5.4-4.6-3.4h5.7z"/><path id="language-star" d="m20 3 .7 2.1h2.2l-1.8 1.3.7 2.1L20 7.2l-1.8 1.3.7-2.1-1.8-1.3h2.2z"/><use href="#language-star" transform="translate(5 5)"/><use href="#language-star" transform="translate(5 12)"/><use href="#language-star" transform="translate(0 17)"/></g></svg></button>
-                <button type="button" data-language="zh-TW" lang="zh-TW" translate="no" title="繁體中文" aria-label="繁體中文" aria-pressed="false"><svg class="language-flag" viewBox="0 0 60 40" aria-hidden="true"><path fill="#fe0000" d="M0 0h60v40H0z"/><path fill="#000095" d="M0 0h30v20H0z"/><path fill="#fff" d="m15 2 1.1 3.7 2.9-2.6-.9 3.8 3.8-.9-2.6 2.9L23 10l-3.7 1.1 2.6 2.9-3.8-.9.9 3.8-2.9-2.6L15 18l-1.1-3.7-2.9 2.6.9-3.8-3.8.9 2.6-2.9L7 10l3.7-1.1-2.6-2.9 3.8.9-.9-3.8 2.9 2.6z"/><circle cx="15" cy="10" r="4.5" fill="#000095"/><circle cx="15" cy="10" r="3.5" fill="#fff"/></svg></button>
-              </div>
-            </div>
+</div>
             <!--
               The steps side by side: where the user is, what is done, and a way to any step. Only
               the open step shows below it, so the page never reads as one long manual.

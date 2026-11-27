@@ -3352,7 +3352,7 @@ function maintain(woken = false) {
  * app kept for it; values stored here always win over the app's copy.
  */
 const APP_LANGUAGE_KEY = 'appLanguage';
-const APP_LANGUAGES = new Set(['en', 'de', 'es', 'fr', 'pt-BR', 'pt-PT', 'ru', 'tr', 'vi', 'ja', 'ko', 'zh-CN', 'zh-TW']);
+const APP_LANGUAGES = new Set(['en']);
 /*
  * 2026-10-30: the extension in one Chrome never stored the app's language in weeks (the same build
  * stored it at once elsewhere) and showed Chrome's language until its worker restarted. Nothing said

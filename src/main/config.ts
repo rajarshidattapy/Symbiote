@@ -406,7 +406,9 @@ const configSchema = z.object({
     }),
     mentionCore: z.boolean().optional().default(true),
     mentionPlugins: z.boolean().optional().default(false),
-    language: z.enum(UI_LANGUAGES).optional(),
+    // Previous releases persisted one of several UI languages. Keep accepting those settings so
+    // an upgrade retains the rest of the profile, but normalize every launch to English.
+    language: z.enum(UI_LANGUAGES).optional().transform(value => value === undefined ? undefined : 'en'),
     // The version this install last started as; What's New shows once per real update (#1172).
     lastSeenVersion: z.string().trim().min(1).max(40).optional().catch(undefined),
     /** #1833: the first-run tour was taken, skipped or declined; it is not offered again. */

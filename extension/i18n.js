@@ -28,8 +28,7 @@
    * not said, `chrome.i18n` answers as before.
    */
   const LANGUAGE_KEY = 'appLanguage';
-  const FOLDERS = Object.freeze({ en: 'en', de: 'de', es: 'es', fr: 'fr', 'pt-BR': 'pt_BR', 'pt-PT': 'pt_PT', ru: 'ru',
-    tr: 'tr', vi: 'vi', ja: 'ja', ko: 'ko', 'zh-CN': 'zh_CN', 'zh-TW': 'zh_TW' });
+  const FOLDERS = Object.freeze({ en: 'en' });
   let catalog = null;
   let catalogLanguage = null;
   const extensionPage = (() => { try { return location.protocol === 'chrome-extension:'; } catch { return true; } })();
